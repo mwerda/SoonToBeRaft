@@ -1,5 +1,4 @@
-//TODO manage timestamps, pass them
-public class Reporter
+class Reporter
 {
     enum OutputType
     {
@@ -26,17 +25,17 @@ public class Reporter
         }
     }
 
-    static void reportCriticalError(String text)
+    private static void reportCriticalError(String text)
     {
         System.err.println("Critical error: " + text);
     }
 
-    static void reportError(String text)
+    private static void reportError(String text)
     {
         System.err.println("Error occurred: " + text);
     }
 
-    static void reportInfo(String text)
+    private static void reportInfo(String text)
     {
         System.out.println(text);
     }

@@ -3,49 +3,35 @@ import java.net.*;
 import java.util.EnumSet;
 import java.util.LinkedList;
 
-//TODO message contains more data than buffer allows
-//TODO string to messages?
-//TODO
-
-public class MulticastSender implements Runnable
+public class MulticastSender extends ReportingMulticastSocket implements Runnable
 {
-    enum VerbosityOptions
-    {
-        CREATE,
-        MESSAGE_SENT,
-        EXCEPTION,
-        CLOSE;
-
-        public static final EnumSet<MulticastReceiver.VerbosityOptions> FULL_VERBOSITY_OPTIONS
-                = EnumSet.allOf(MulticastReceiver.VerbosityOptions.class);
-    }
-
-    int port;
-    String receiverGroup;
-    int ttl;
-    ReportingMulticastSocket multicastSocket;
-
     private Buffer buffer;
     private LinkedList<String> messageQueue;
     private int interval = 0;
 
-    VerbosityOptions verbosityOptions = VerbosityOptions.FULL_VERBOSITY_OPTIONS;
-
-    MulticastSender(int port, java.lang.String receiverGroup, int ttl, int bufferSize) throws IOException
+    MulticastSender(int port, String multicastGroup, int bufferSize) throws IOException
     {
-        this.port = port;
-        this.receiverGroup = receiverGroup;
-        this.ttl = ttl;
+        super(port, multicastGroup);
         this.buffer = new Buffer(bufferSize);
-        this.multicastSocket = new ReportingMulticastSocket();
         this.messageQueue = new LinkedList<String>();
-        multicastSocket.joinGroup(InetAddress.getByName(receiverGroup));
     }
 
-    MulticastSender(int port, java.lang.String receiverGroup, int ttl, int bufferSize, int interval) throws IOException
+    MulticastSender(int port, String multicastGroup, int bufferSize, int interval) throws IOException
     {
-        this(port, receiverGroup, ttl, bufferSize);
+        this(port, multicastGroup, bufferSize);
         this.interval = interval;
+    }
+
+    MulticastSender(int port, String multicastGroup, int bufferSize, EnumSet<VerbosityFlags> verbosityOptions) throws IOException
+    {
+        this(port, multicastGroup, bufferSize);
+        this.verbosityOptions = verbosityOptions;
+    }
+
+    MulticastSender(int port, String multicastGroup, int bufferSize, int interval, EnumSet<VerbosityFlags> verbosityOptions) throws IOException
+    {
+        this(port, multicastGroup, bufferSize, interval);
+        this.verbosityOptions = verbosityOptions;
     }
 
     void broadcastMessage(byte[] data) throws IOException
@@ -54,14 +40,13 @@ public class MulticastSender implements Runnable
         DatagramPacket packet = new DatagramPacket(
                 buffer.data,
                 buffer.lastUsedByteIndex,
-                InetAddress.getByName(receiverGroup),
+                InetAddress.getByName(multicastGroup),
                 port
         );
-
         multicastSocket.send(packet);
     }
 
-    public void addMessageToQueue(String message)
+    void addMessageToQueue(String message)
     {
         messageQueue.add(message);
     }
@@ -69,9 +54,9 @@ public class MulticastSender implements Runnable
     @Override
     public void run()
     {
-        while(true)
+        while(!Thread.currentThread().isInterrupted())
         {
-            if (!messageQueue.isEmpty())
+            if(!messageQueue.isEmpty())
             {
                 String message = messageQueue.poll();
                 byte[] data = message.getBytes();
@@ -81,7 +66,11 @@ public class MulticastSender implements Runnable
                 }
                 catch(IOException e)
                 {
-                    Reporter.reportError("Failed to broadcast message.");
+                    reportIfFlag(
+                            VerbosityFlags.EXCEPTION,
+                            "Broadcast failed.\n" + e.toString(),
+                            Reporter.OutputType.INFO
+                    );
                 }
 
                 if(interval != 0)
@@ -92,18 +81,25 @@ public class MulticastSender implements Runnable
                     }
                     catch(InterruptedException e)
                     {
-                        Reporter.reportError("Sender failed to sleep for interval.\n" + e.toString());
+                        reportIfFlag(
+                                VerbosityFlags.EXCEPTION,
+                                "Sender failed on Thread.sleep().\n" + e.toString(),
+                                Reporter.OutputType.INFO
+                        );
                     }
                 }
             }
         }
-    }
 
-    private void reportIfFlag(VerbosityOptions verbosityCondition, String info, Reporter.OutputType infoType)
-    {
-        if(verbosityOptions.contains(verbosityCondition))
+        reportIfFlag(VerbosityFlags.CLOSE, "Thread interrupted - closing sender socket", Reporter.OutputType.INFO);
+        try
         {
-            Reporter.report(info, infoType);
+            multicastSocket.leaveGroup(InetAddress.getByName(multicastGroup));
         }
+        catch(IOException e)
+        {
+            reportIfFlag(VerbosityFlags.EXCEPTION, "Unknown multicast group", Reporter.OutputType.ERROR);
+        }
+        multicastSocket.close();
     }
 }
