@@ -1,8 +1,6 @@
 import java.io.IOException;
 import java.net.*;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.locks.Lock;
 
 public class MulticastSender extends ReportingMulticastSocket implements Runnable
 {
@@ -10,7 +8,8 @@ public class MulticastSender extends ReportingMulticastSocket implements Runnabl
     private LinkedList<String> messageQueue;
     private int interval = 0;
     private long sentCount = 0;
-    private int reportingSentCountStep = 100000;
+    private int reportingSentCountInterval = 100000;
+    private long time = System.nanoTime();
     public final Object lock = new Object();
 
     MulticastSender(int port, String multicastGroup, int bufferSize) throws IOException
@@ -50,9 +49,17 @@ public class MulticastSender extends ReportingMulticastSocket implements Runnabl
         multicastSocket.send(packet);
 
         sentCount++;
-        if(sentCount % reportingSentCountStep == 0)
+        if(sentCount % reportingSentCountInterval == 0)
         {
-            reportIfFlag(VerbosityFlags.INFO, "Sent " + Long.toString(sentCount) + " messages", Reporter.OutputType.INFO);
+            long timeDiff = System.nanoTime() - time;
+            reportIfFlag(
+                    VerbosityFlags.INFO,
+                    "Sent " + Long.toString(sentCount) + " messages, last " + reportingSentCountInterval + " in "
+                            + timeDiff / (float) 1000000 + " ms "
+                            + "with average interval of " + timeDiff / (float) 1000000 / (float) reportingSentCountInterval + " ms",
+                    Reporter.OutputType.INFO
+            );
+            time = System.nanoTime();
         }
     }
 

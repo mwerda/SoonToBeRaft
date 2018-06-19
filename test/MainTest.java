@@ -105,7 +105,7 @@ class MainTest
     void testMultipleSendersSingleReceiver() throws IOException, InterruptedException
     {
         final int packets = 1000000;
-        final int threadsNumber = 5;
+        final int threadsNumber = 8;
         ReceiverThreadPair receiverThreadPair = Main.buildReceiverThreadPair();
 
         SenderThreadPair[] senderThreadPairs = new SenderThreadPair[threadsNumber];
