@@ -10,35 +10,35 @@ class MainTest
     void testMulticast1000() throws IOException, InterruptedException
     {
         System.out.println("Multicast: 1000 packets\n");
-        parametrizedMulticastTest(0, 20000, 6000, 1000);
+        parametrizedMulticastTest(0, 3000, 2000, 1000);
     }
 
     @Test
     void testMulticast10000() throws IOException, InterruptedException
     {
         System.out.println("Multicast: 10 000 packets\n");
-        parametrizedMulticastTest(0, 20000, 6000, 10000);
+        parametrizedMulticastTest(0, 3000, 2000, 10000);
     }
 
     @Test
     void testMulticast100000() throws IOException, InterruptedException
     {
         System.out.println("Multicast: 100 000 packets\n");
-        parametrizedMulticastTest(0, 20000, 6000, 100000);
+        parametrizedMulticastTest(0, 3000, 2000, 100000);
     }
 
     @Test
     void testMulticast1000000() throws IOException, InterruptedException
     {
         System.out.println("Multicast: 1 000 000 packets\n");
-        parametrizedMulticastTest(0, 20000, 6000, 1000000);
+        parametrizedMulticastTest(0, 3000, 2000, 1000000);
     }
 
     @Test
     void testMulticast10000000() throws IOException, InterruptedException
     {
         System.out.println("Multicast: 10 000 000 packets\n");
-        parametrizedMulticastTest(0, 20000, 6000, 10000000);
+        parametrizedMulticastTest(0, 3000, 2000, 10000000);
     }
 
     private void parametrizedMulticastTest(int receiverMinWaitTime, int receiverMaxWaitTime, int waitTimeStep, int packets) throws IOException, InterruptedException
@@ -59,19 +59,26 @@ class MainTest
             {
                 sender.addMessageToQueue(Integer.toString(i));
             }
-            receiver.receivedMessages = new LinkedList<Message>();
-            assertEquals(0, receiver.receivedMessages.size());
+
             senderThread.start();
 
+            synchronized(sender.lock)
+            {
+                sender.lock.wait();
+            }
+
             System.out.println("Successful delivery rate: " + (float) receiver.receivedMessages.size() / packets);
-            System.out.println("Delivered " + Integer.toString(receiver.receivedMessages.size()) + " of " + packets + " packets");
+            System.out.println("Delivered " + Integer.toString(receiver.receivedMessages.size()) + " out of " + packets + " packets");
             System.out.println("***************************\n");
 
-            Thread.sleep(10000);
+            synchronized(sender.lock)
+            {
+                sender.lock.wait();
+            }
 
             senderThread.interrupt();
             receiverThread.interrupt();
-            Thread.sleep(1000);
+            Thread.sleep(500);
         }
     }
 
@@ -92,5 +99,35 @@ class MainTest
         receiverThread.interrupt();
 
         Thread.sleep(5000);
+    }
+
+    @Test
+    void testMultipleSendersSingleReceiver() throws IOException, InterruptedException
+    {
+        final int packets = 1000000;
+        final int threadsNumber = 5;
+        ReceiverThreadPair receiverThreadPair = Main.buildReceiverThreadPair();
+
+        SenderThreadPair[] senderThreadPairs = new SenderThreadPair[threadsNumber];
+        for(int i = 0; i < threadsNumber; i++)
+        {
+            senderThreadPairs[i] = Main.buildSenderThreadPair(1000000);
+        }
+
+        for(SenderThreadPair pair : senderThreadPairs)
+        {
+            pair.thread.start();
+        }
+
+        for(SenderThreadPair pair : senderThreadPairs)
+        {
+            synchronized(pair.sender.lock)
+            {
+               pair.sender.lock.wait();
+            }
+        }
+
+        System.out.println("Sent " + packets * threadsNumber + " packets, received " + receiverThreadPair.receiver.receivedMessages.size());
+        System.out.println("Successful delivery rate: " + (float) receiverThreadPair.receiver.receivedMessages.size() / packets * threadsNumber);
     }
 }

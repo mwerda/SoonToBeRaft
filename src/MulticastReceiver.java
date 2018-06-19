@@ -9,6 +9,8 @@ public class MulticastReceiver extends ReportingMulticastSocket implements Runna
 {
     Buffer buffer;
     LinkedList<Message> receivedMessages;
+    private int reportingCountStep = 100000;
+    public final Object lock = new Object();
 
     MulticastReceiver(int port, String multicastGroup, int bufferSize) throws IOException
     {
@@ -29,7 +31,7 @@ public class MulticastReceiver extends ReportingMulticastSocket implements Runna
     {
         try
         {
-            multicastSocket.setSoTimeout(1000);
+            multicastSocket.setSoTimeout(300);
         }
         catch(SocketException e)
         {
@@ -57,6 +59,15 @@ public class MulticastReceiver extends ReportingMulticastSocket implements Runna
             ));
 
             nullifyBuffer();
+
+            if(receivedMessages.size() % reportingCountStep == 0)
+            {
+                reportIfFlag(
+                        VerbosityFlags.INFO,
+                        "Received " + Integer.toString(receivedMessages.size()) + " messages",
+                        Reporter.OutputType.INFO
+                );
+            }
         }
 
         reportIfFlag(VerbosityFlags.CLOSE, "Thread interrupted - closing receiver socket", Reporter.OutputType.INFO);

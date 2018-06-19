@@ -1,13 +1,17 @@
 import java.io.IOException;
 import java.net.*;
-import java.util.EnumSet;
-import java.util.LinkedList;
+import java.util.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.locks.Lock;
 
 public class MulticastSender extends ReportingMulticastSocket implements Runnable
 {
     private Buffer buffer;
     private LinkedList<String> messageQueue;
     private int interval = 0;
+    private long sentCount = 0;
+    private int reportingSentCountStep = 100000;
+    public final Object lock = new Object();
 
     MulticastSender(int port, String multicastGroup, int bufferSize) throws IOException
     {
@@ -44,6 +48,12 @@ public class MulticastSender extends ReportingMulticastSocket implements Runnabl
                 port
         );
         multicastSocket.send(packet);
+
+        sentCount++;
+        if(sentCount % reportingSentCountStep == 0)
+        {
+            reportIfFlag(VerbosityFlags.INFO, "Sent " + Long.toString(sentCount) + " messages", Reporter.OutputType.INFO);
+        }
     }
 
     void addMessageToQueue(String message)
@@ -56,38 +66,40 @@ public class MulticastSender extends ReportingMulticastSocket implements Runnabl
     {
         while(!Thread.currentThread().isInterrupted())
         {
-            if(!messageQueue.isEmpty())
+            synchronized(lock)
             {
-                String message = messageQueue.poll();
-                byte[] data = message.getBytes();
-                try
+                while(!messageQueue.isEmpty())
                 {
-                    broadcastMessage(data);
-                }
-                catch(IOException e)
-                {
-                    reportIfFlag(
-                            VerbosityFlags.EXCEPTION,
-                            "Broadcast failed.\n" + e.toString(),
-                            Reporter.OutputType.INFO
-                    );
-                }
-
-                if(interval != 0)
-                {
+                    String message = (String) messageQueue.poll();
+                    byte[] data = message.getBytes();
                     try
                     {
-                        Thread.sleep(interval);
-                    }
-                    catch(InterruptedException e)
+                        broadcastMessage(data);
+                    } catch (IOException e)
                     {
                         reportIfFlag(
                                 VerbosityFlags.EXCEPTION,
-                                "Sender failed on Thread.sleep().\n" + e.toString(),
+                                "Broadcast failed.\n" + e.toString(),
                                 Reporter.OutputType.INFO
                         );
                     }
+
+//                    if (interval != 0)
+//                    {
+//                        try
+//                        {
+//                            Thread.sleep(interval);
+//                        } catch (InterruptedException e)
+//                        {
+//                            reportIfFlag(
+//                                    VerbosityFlags.EXCEPTION,
+//                                    "Sender failed on Thread.sleep().\n" + e.toString(),
+//                                    Reporter.OutputType.INFO
+//                            );
+//                        }
+//                    }
                 }
+                lock.notifyAll();
             }
         }
 

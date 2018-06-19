@@ -8,6 +8,7 @@ class ReportingMulticastSocket
     enum VerbosityFlags
     {
         CREATE,
+        INFO,
         MESSAGE_RECEIVED,
         MESSAGE_SENT,
         QUEUE_EMPTY,
