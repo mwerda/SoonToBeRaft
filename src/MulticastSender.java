@@ -2,6 +2,10 @@ import java.io.IOException;
 import java.net.*;
 import java.util.*;
 
+//externalizable
+//kopiowanie tablicy
+//self4j
+
 public class MulticastSender extends ReportingMulticastSocket implements Runnable
 {
     private Buffer buffer;
