@@ -10,10 +10,6 @@ public class Main
         Draft draft = new Draft(Draft.DraftType.HEARTBEAT, 10, (byte) 20, new RaftEntry[] {entry});
         byte[] array = draft.toByteArray();
 
-        Draft receivedDraft = new Draft(array);
-
-        System.out.println(draft.toByteArray());
-
 //        MulticastReceiver receiver = new MulticastReceiver(5000, "225.4.5.6", 2048);
 //        Thread receiverThread = new Thread(receiver, "Receiver");
 //        receiverThread.start();

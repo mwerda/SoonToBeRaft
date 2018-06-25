@@ -72,4 +72,12 @@ class RaftEntry
     {
         return BYTES_PER_LENGTH_DECLARATION + BYTES_PER_OPERATION_TYPE + BYTES_PER_VALUE + key.length();
     }
+
+    public boolean isEquivalentTo(RaftEntry comparedRaftEntry)
+    {
+        return this.size == comparedRaftEntry.size
+        && this.operationType == comparedRaftEntry.operationType
+        && this.value == comparedRaftEntry.value
+        && this.key.equals(comparedRaftEntry.key);
+    }
 }

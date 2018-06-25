@@ -45,23 +45,22 @@ class Draft
         }
     }
 
-    DraftType draftType;
-    int term;
-    byte leaderID;
-    RaftEntry[] raftEntries;
-    int entriesCount;
+    private static final int BYTES_PER_MESSAGE_TYPE = 1;
+    private static final int BYTES_PER_TERM = Integer.SIZE / Byte.SIZE;
+    private static final int BYTES_PER_LEADER_ID = 1;
+    private static final int BYTES_PER_ENTRIES_COUNT = Integer.SIZE / Byte.SIZE;
 
-    //TODO: automate calculations
-    static final int BYTES_PER_MESSAGE_TYPE = 1;
-    static final int BYTES_PER_TERM = Integer.SIZE / Byte.SIZE;
-    static final int BYTES_PER_LEADER_ID = 1;
-    static final int BYTES_PER_ENTRIES_COUNT = Integer.SIZE / Byte.SIZE;
+    private static final int POSITION_MESSAGE_TYPE = 0;
+    private static final int POSITION_TERM = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
+    private static final int POSITION_LEADER_ID = POSITION_TERM + BYTES_PER_TERM;
+    private static final int POSITION_ENTRIES_COUNT = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
+    private static final int POSITION_RAFT_ENTRIES = POSITION_ENTRIES_COUNT + BYTES_PER_ENTRIES_COUNT;
 
-    static final int POSITION_MESSAGE_TYPE = 0;
-    static final int POSITION_TERM = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
-    static final int POSITION_LEADER_ID = POSITION_TERM + BYTES_PER_TERM;
-    static final int POSITION_ENTRIES_COUNT = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
-    static final int POSITION_RAFT_ENTRIES = POSITION_ENTRIES_COUNT + BYTES_PER_ENTRIES_COUNT;
+    private DraftType draftType;
+    private int term;
+    private byte leaderID;
+    private RaftEntry[] raftEntries;
+    private int entriesCount;
 
     Draft(DraftType draftType, int term, byte leaderID, RaftEntry[] raftEntries)
     {
@@ -83,11 +82,11 @@ class Draft
 
         RaftEntry[] decodedEntries = new RaftEntry[entriesCount];
         int currentPos = POSITION_RAFT_ENTRIES;
-        for(int i = 0; i <= entriesCount; i++)
+        for(int i = 0; i < entriesCount; i++)
         {
             int frameStartingPos = currentPos;
             int frameLength = ByteBuffer.wrap(
-                    Arrays.copyOfRange(array, i, i + RaftEntry.BYTES_PER_LENGTH_DECLARATION)
+                    Arrays.copyOfRange(array, currentPos, currentPos + RaftEntry.BYTES_PER_LENGTH_DECLARATION)
             ).getInt();
 
             currentPos += RaftEntry.BYTES_PER_LENGTH_DECLARATION;
@@ -99,7 +98,7 @@ class Draft
             ).getInt();
 
             currentPos += RaftEntry.BYTES_PER_VALUE;
-            String key = new String(Arrays.copyOfRange(array, currentPos, i + frameLength));
+            String key = new String(Arrays.copyOfRange(array, currentPos, frameStartingPos + frameLength));
 
             decodedEntries[i] = new RaftEntry(operationType, value, key);
             currentPos = frameStartingPos + frameLength;
@@ -127,5 +126,24 @@ class Draft
         }
 
         return byteBuffer.array();
+    }
+
+    public boolean isEquivalentTo(Draft comparedDraft)
+    {
+        boolean shallowEquivalence =
+            this.draftType == comparedDraft.draftType
+            && this.term == comparedDraft.term
+            && this.leaderID == comparedDraft.leaderID
+            && this.entriesCount == comparedDraft.entriesCount;
+
+        if(!shallowEquivalence)
+            return false;
+
+        for(int i = 0; i < this.entriesCount; i++)
+        {
+            if(!this.raftEntries[i].isEquivalentTo(comparedDraft.raftEntries[i]))
+                return false;
+        }
+        return true;
     }
 }
