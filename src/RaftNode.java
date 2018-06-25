@@ -10,12 +10,12 @@ public class RaftNode
     }
 
     LinkedList<RaftEntry> raftEntries;
-    int id;
+    byte id;
     Role role;
     int heartbeatPeriod;
     int term;
 
-    RaftNode(int id, int heartbeatPeriod)
+    RaftNode(byte id, int heartbeatPeriod)
     {
         this.id = id;
         this.heartbeatPeriod = heartbeatPeriod;
@@ -35,7 +35,7 @@ public class RaftNode
 
     Draft prepareHeartbeatDraft()
     {
-        return new Draft(Draft.MessageType.HEARTBEAT, term, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
+        return new Draft(Draft.DraftType.HEARTBEAT, term, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
     }
 
     void sendHeartbeat()

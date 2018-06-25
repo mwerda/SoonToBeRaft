@@ -1,5 +1,4 @@
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -8,7 +7,7 @@ public class Main
     public static void main(String[] args) throws IOException, InterruptedException
     {
         RaftEntry entry = new RaftEntry(RaftEntry.OperationType.SET, 1000, "dupa");
-        Draft draft = new Draft(Draft.MessageType.HEARTBEAT, 10, 20, new RaftEntry[] {entry});
+        Draft draft = new Draft(Draft.DraftType.HEARTBEAT, 10, (byte) 20, new RaftEntry[] {entry});
         byte[] array = draft.toByteArray();
 
         Draft receivedDraft = new Draft(array);

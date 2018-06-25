@@ -2,9 +2,9 @@
  * Draft is a protocol utilized by current implementation of Raft algorithm.
  * Draft Heartbeat messages are built as follows:
  *
- * |         1 Byte           |   4 Bytes   | 4 Bytes   | variable length |
- * |--------------------------|-------------|-----------|-----------------|
- * | Message type declaration | Term number | Leader ID | RaftEntry array |
+ * |        1 Byte          |   4 Bytes   |  1 Byte   |          4 Bytes         | variable length |
+ * |------------------------|-------------|-----------|--------------------------|-----------------|
+ * | Draft type declaration | Term number | Leader ID | No of RaftEntry elements | RaftEntry array |
  *
  * See RaftEntry javadoc for further explanation on how it is encapsulated in Draft
  */
@@ -14,7 +14,7 @@ import java.util.Arrays;
 
 class Draft
 {
-    enum MessageType
+    enum DraftType
     {
         HEARTBEAT((byte) 1),
         VOTE_FOR_CANDIDATE((byte) 2),
@@ -22,7 +22,7 @@ class Draft
 
         private byte value;
 
-        MessageType(byte value)
+        DraftType(byte value)
         {
             this.value = value;
         }
@@ -32,86 +32,94 @@ class Draft
             return value;
         }
 
-        public static MessageType fromByte(byte i)
+        public static DraftType fromByte(byte i)
         {
-            for (MessageType messageType : MessageType.values())
+            for (DraftType draftType : DraftType.values())
             {
-                if (messageType.getValue() == i)
+                if (draftType.getValue() == i)
                 {
-                    return messageType;
+                    return draftType;
                 }
             }
             return null;
         }
     }
 
-    MessageType messageType;
+    DraftType draftType;
     int term;
-    int leaderID;
+    byte leaderID;
     RaftEntry[] raftEntries;
+    int entriesCount;
 
     //TODO: automate calculations
-    final int BYTES_PER_MESSAGE_TYPE = 1;
-    final int BYTES_PER_TERM = Integer.SIZE / Byte.SIZE;
-    final int BYTES_PER_LEADER_ID = Integer.SIZE / Byte.SIZE;;
+    static final int BYTES_PER_MESSAGE_TYPE = 1;
+    static final int BYTES_PER_TERM = Integer.SIZE / Byte.SIZE;
+    static final int BYTES_PER_LEADER_ID = 1;
+    static final int BYTES_PER_ENTRIES_COUNT = Integer.SIZE / Byte.SIZE;
 
-    final int POSITION_MESSAGE_TYPE = 0;
-    final int POSITION_TERM = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
-    final int POSITION_LEADER_ID = POSITION_TERM + BYTES_PER_TERM;
-    final int POSITION_RAFT_ENTRIES = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
+    static final int POSITION_MESSAGE_TYPE = 0;
+    static final int POSITION_TERM = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
+    static final int POSITION_LEADER_ID = POSITION_TERM + BYTES_PER_TERM;
+    static final int POSITION_ENTRIES_COUNT = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
+    static final int POSITION_RAFT_ENTRIES = POSITION_ENTRIES_COUNT + BYTES_PER_ENTRIES_COUNT;
 
-    Draft(MessageType messageType, int term, int leaderID, RaftEntry[] raftEntries)
+    Draft(DraftType draftType, int term, byte leaderID, RaftEntry[] raftEntries)
     {
-        this.messageType = messageType;
+        this.draftType = draftType;
         this.term = term;
         this.leaderID = leaderID;
         this.raftEntries = raftEntries;
+        this.entriesCount = raftEntries.length;
     }
 
-    Draft(byte[] array)
+    static Draft fromByteArray(byte[] array)
     {
-        MessageType messageType = MessageType.fromByte(array[POSITION_MESSAGE_TYPE]);
+        DraftType draftType = DraftType.fromByte(array[POSITION_MESSAGE_TYPE]);
         int term = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_TERM, POSITION_TERM + BYTES_PER_TERM)).getInt();
-        int leaderID = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_LEADER_ID, POSITION_LEADER_ID + BYTES_PER_LEADER_ID)).getInt();
+        byte leaderID = array[POSITION_LEADER_ID];
+        int entriesCount = ByteBuffer.wrap(
+                Arrays.copyOfRange(array, POSITION_ENTRIES_COUNT, POSITION_ENTRIES_COUNT + BYTES_PER_ENTRIES_COUNT)
+        ).getInt();
 
-        if(array.length > POSITION_RAFT_ENTRIES)
+        RaftEntry[] decodedEntries = new RaftEntry[entriesCount];
+        int currentPos = POSITION_RAFT_ENTRIES;
+        for(int i = 0; i <= entriesCount; i++)
         {
-            int i = POSITION_RAFT_ENTRIES;
-            while(i < array.length)
-            {
-                int currentPos = i;
-                int frameLength = ByteBuffer.wrap(
-                        Arrays.copyOfRange(array, i, i + RaftEntry.BYTES_PER_LENGTH_DECLARATION)
-                ).getInt();
+            int frameStartingPos = currentPos;
+            int frameLength = ByteBuffer.wrap(
+                    Arrays.copyOfRange(array, i, i + RaftEntry.BYTES_PER_LENGTH_DECLARATION)
+            ).getInt();
 
-                currentPos += RaftEntry.BYTES_PER_LENGTH_DECLARATION;
-                RaftEntry.OperationType operationType = RaftEntry.OperationType.fromByte(array[currentPos]);
+            currentPos += RaftEntry.BYTES_PER_LENGTH_DECLARATION;
+            RaftEntry.OperationType operationType = RaftEntry.OperationType.fromByte(array[currentPos]);
 
-                currentPos += RaftEntry.BYTES_PER_OPERATION_TYPE;
-                int value = ByteBuffer.wrap(
-                        Arrays.copyOfRange(array, currentPos, currentPos + RaftEntry.BYTES_PER_VALUE)
-                ).getInt();
+            currentPos += RaftEntry.BYTES_PER_OPERATION_TYPE;
+            int value = ByteBuffer.wrap(
+                    Arrays.copyOfRange(array, currentPos, currentPos + RaftEntry.BYTES_PER_VALUE)
+            ).getInt();
 
-                currentPos += RaftEntry.BYTES_PER_VALUE;
-                String key = new String(Arrays.copyOfRange(array, currentPos, i + frameLength));
+            currentPos += RaftEntry.BYTES_PER_VALUE;
+            String key = new String(Arrays.copyOfRange(array, currentPos, i + frameLength));
 
-                i += frameLength;
-            }
-
+            decodedEntries[i] = new RaftEntry(operationType, value, key);
+            currentPos = frameStartingPos + frameLength;
         }
+        return new Draft(draftType, term, leaderID, decodedEntries);
     }
 
     byte[] toByteArray()
     {
-        int entriesSizeCounter = 0;
+        int aggregatedEntriesSize = 0;
 
         for(RaftEntry entry : raftEntries)
         {
-            entriesSizeCounter += entry.getSize();
+            aggregatedEntriesSize += entry.getSize();
         }
 
-        ByteBuffer byteBuffer = ByteBuffer.allocate(9 + entriesSizeCounter);
-        byteBuffer.put(messageType.getValue()).putInt(term).putInt(leaderID);
+        ByteBuffer byteBuffer = ByteBuffer.allocate(
+                BYTES_PER_MESSAGE_TYPE + BYTES_PER_TERM + BYTES_PER_LEADER_ID + BYTES_PER_ENTRIES_COUNT + aggregatedEntriesSize
+        );
+        byteBuffer.put(draftType.getValue()).putInt(term).put(leaderID).putInt(entriesCount);
 
         for(RaftEntry entry : raftEntries)
         {
