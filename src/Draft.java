@@ -1,4 +1,5 @@
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 class Draft
 {
@@ -38,11 +39,35 @@ class Draft
     int leaderID;
     RaftEntry[] raftEntries;
 
-    Draft(MessageType messageType, int term, int leaderID)
+    //TODO: automate calculations
+    final int BYTES_PER_MESSAGE_TYPE = 1;
+    final int BYTES_PER_TERM = Integer.SIZE / Byte.SIZE;
+    final int BYTES_PER_LEADER_ID = Integer.SIZE / Byte.SIZE;;
+
+    final int POSITION_MESSAGE_TYPE = 0;
+    final int POSITION_TERM = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
+    final int POSITION_LEADER_ID = POSITION_TERM + BYTES_PER_TERM;
+    final int POSITION_RAFT_ENTRIES = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
+
+    Draft(MessageType messageType, int term, int leaderID, RaftEntry[] raftEntries)
     {
         this.messageType = messageType;
         this.term = term;
         this.leaderID = leaderID;
+        this.raftEntries = raftEntries;
+    }
+
+    Draft(byte[] array)
+    {
+        MessageType messageType = MessageType.fromByte(array[POSITION_MESSAGE_TYPE]);
+        int term = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_TERM, POSITION_TERM + BYTES_PER_TERM)).getInt();
+        int leaderID = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_LEADER_ID, POSITION_LEADER_ID + BYTES_PER_LEADER_ID)).getInt();
+
+        if(array.length > POSITION_RAFT_ENTRIES)
+        {
+            int i = POSITION_RAFT_ENTRIES;
+
+        }
     }
 
     byte[] toByteArray()
