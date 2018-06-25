@@ -7,11 +7,11 @@ public class Main
 {
     public static void main(String[] args) throws IOException, InterruptedException
     {
-        Draft draft = new Draft(Draft.MessageType.HEARTBEAT, 10, 20);
         RaftEntry entry = new RaftEntry(RaftEntry.OperationType.SET, 1000, "dupa");
-        ByteBuffer buf = entry.toByteBuffer();
-        byte[] array = buf.array();
+        Draft draft = new Draft(Draft.MessageType.HEARTBEAT, 10, 20, new RaftEntry[] {entry});
+        byte[] array = draft.toByteArray();
 
+        Draft receivedDraft = new Draft(array);
 
         System.out.println(draft.toByteArray());
 

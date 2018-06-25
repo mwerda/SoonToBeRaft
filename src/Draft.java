@@ -1,3 +1,14 @@
+/**
+ * Draft is a protocol utilized by current implementation of Raft algorithm.
+ * Draft Heartbeat messages are built as follows:
+ *
+ * |         1 Byte           |   4 Bytes   | 4 Bytes   | variable length |
+ * |--------------------------|-------------|-----------|-----------------|
+ * | Message type declaration | Term number | Leader ID | RaftEntry array |
+ *
+ * See RaftEntry javadoc for further explanation on how it is encapsulated in Draft
+ */
+
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -66,6 +77,26 @@ class Draft
         if(array.length > POSITION_RAFT_ENTRIES)
         {
             int i = POSITION_RAFT_ENTRIES;
+            while(i < array.length)
+            {
+                int currentPos = i;
+                int frameLength = ByteBuffer.wrap(
+                        Arrays.copyOfRange(array, i, i + RaftEntry.BYTES_PER_LENGTH_DECLARATION)
+                ).getInt();
+
+                currentPos += RaftEntry.BYTES_PER_LENGTH_DECLARATION;
+                RaftEntry.OperationType operationType = RaftEntry.OperationType.fromByte(array[currentPos]);
+
+                currentPos += RaftEntry.BYTES_PER_OPERATION_TYPE;
+                int value = ByteBuffer.wrap(
+                        Arrays.copyOfRange(array, currentPos, currentPos + RaftEntry.BYTES_PER_VALUE)
+                ).getInt();
+
+                currentPos += RaftEntry.BYTES_PER_VALUE;
+                String key = new String(Arrays.copyOfRange(array, currentPos, i + frameLength));
+
+                i += frameLength;
+            }
 
         }
     }
@@ -80,7 +111,7 @@ class Draft
         }
 
         ByteBuffer byteBuffer = ByteBuffer.allocate(9 + entriesSizeCounter);
-        byteBuffer.putShort(messageType.getValue()).putInt(term).putInt(leaderID);
+        byteBuffer.put(messageType.getValue()).putInt(term).putInt(leaderID);
 
         for(RaftEntry entry : raftEntries)
         {
