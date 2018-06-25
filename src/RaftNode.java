@@ -1,3 +1,5 @@
+import java.util.LinkedList;
+
 public class RaftNode
 {
     enum Role
@@ -6,4 +8,9 @@ public class RaftNode
         CANDIDATE,
         LEADER
     }
+
+    LinkedList<RaftEntry> raftEntries;
+    int id;
+
+
 }

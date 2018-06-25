@@ -4,7 +4,7 @@ class Draft
 {
     enum MessageType
     {
-        APPEND_ENTRIES((byte) 1),
+        HEARTBEAT((byte) 1),
         VOTE_FOR_CANDIDATE((byte) 2),
         REQUEST_VOTE((byte) 3);
 
@@ -36,7 +36,7 @@ class Draft
     MessageType messageType;
     int term;
     int leaderID;
-    //RaftEntry[] entries;
+    RaftEntry[] raftEntries;
 
     Draft(MessageType messageType, int term, int leaderID)
     {
@@ -47,8 +47,21 @@ class Draft
 
     byte[] toByteArray()
     {
-        ByteBuffer byteBuffer = ByteBuffer.allocate(9);
+        int entriesSizeCounter = 0;
+
+        for(RaftEntry entry : raftEntries)
+        {
+            entriesSizeCounter += entry.getSize();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.allocate(9 + entriesSizeCounter);
         byteBuffer.putShort(messageType.getValue()).putInt(term).putInt(leaderID);
+
+        for(RaftEntry entry : raftEntries)
+        {
+            byteBuffer.put(entry.toByteBuffer());
+        }
+
         return byteBuffer.array();
     }
 }
