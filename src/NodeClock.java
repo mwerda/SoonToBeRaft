@@ -10,6 +10,7 @@ public class NodeClock
     private long electionTimeoutMilis;
     private long heartbeatTimeoutStartMoment;
     private long heartbeatTimeoutMilis;
+    private long unboundTimer;
     private long[] electionTimeoutBounds;
     private Random randomizer;
 
@@ -23,6 +24,7 @@ public class NodeClock
 
         this.electionTimeoutStartMoment = startTime;
         this.heartbeatTimeoutStartMoment = startTime;
+        this.unboundTimer = startTime;
 
         this.randomizeElectionTimeout();
     }
@@ -55,6 +57,13 @@ public class NodeClock
     public long getRunningTimeMilis()
     {
         return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - this.startTime);
+    }
+
+    public long measureUnbound()
+    {
+        long elapsed = System.nanoTime() - unboundTimer;
+        unboundTimer = System.nanoTime();
+        return elapsed;
     }
 
     public boolean electionTimeouted()
