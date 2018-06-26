@@ -1,6 +1,9 @@
+import java.io.IOException;
 import java.util.LinkedList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class RaftNode
+class RaftNode
 {
     enum Role
     {
@@ -9,18 +12,49 @@ public class RaftNode
         LEADER
     }
 
-    LinkedList<RaftEntry> raftEntries;
     byte id;
-    Role role;
     int heartbeatPeriod;
     int term;
 
-    RaftNode(byte id, int heartbeatPeriod)
+    Role role;
+    LinkedList<RaftEntry> raftEntries;
+    ExecutorService executorService;
+    //ServerSocket socket;
+    NodeClock clock;
+
+    public final static long[] ELECTION_TIMEOUT_BOUNDS = {150, 300};
+    public final static long HEARTBEAT_TIMEOUT = 40;
+
+    RaftNode(byte id, int heartbeatPeriod, int port) throws IOException
     {
         this.id = id;
         this.heartbeatPeriod = heartbeatPeriod;
-        role = Role.FOLLOWER;
         this.term = 0;
+        this.role = Role.FOLLOWER;
+        this.executorService = Executors.newFixedThreadPool(4);
+        //this.socket = new ServerSocket(port);
+        this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
+    }
+
+    void runNode()
+    {
+        executorService.execute(new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                Thread.currentThread().setName("Clock");
+                while(true)
+                {
+                    if(clock.electionTimeouted())
+                    {
+                        System.out.println("Election timeouted");
+                        System.out.println("Overall running time: " + clock.getRunningTimeMilis());
+                        clock.resetElectionTimeoutStartMoment();
+                    }
+                }
+            }
+        });
     }
 
     void appendSet(int value, String key)

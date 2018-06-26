@@ -6,9 +6,12 @@ public class Main
 {
     public static void main(String[] args) throws IOException, InterruptedException
     {
-        RaftEntry entry = new RaftEntry(RaftEntry.OperationType.SET, 1000, "dupa");
-        Draft draft = new Draft(Draft.DraftType.HEARTBEAT, 10, (byte) 20, new RaftEntry[] {entry});
-        byte[] array = draft.toByteArray();
+        RaftNode node = new RaftNode((byte) 1, 40, 3000);
+        node.runNode();
+        while(!node.executorService.isTerminated())
+        {
+            Thread.sleep(1000);
+        }
 
 //        MulticastReceiver receiver = new MulticastReceiver(5000, "225.4.5.6", 2048);
 //        Thread receiverThread = new Thread(receiver, "Receiver");
