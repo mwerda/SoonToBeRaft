@@ -7,6 +7,9 @@
  * 4. Sender, polling Drafts from outgoingDrafts and sending them to other nodes
  */
 
+//TODO build a logger
+//TODO dumping replicated log to file
+
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.concurrent.*;
@@ -90,7 +93,28 @@ class RaftNode
 
         executorService.execute(() ->
         {
+            Thread.currentThread().setName("Receiver");
+            // Receive messages
+        });
+
+        executorService.execute(() ->
+        {
             Thread.currentThread().setName("Consumer");
+            // Consume
+        });
+
+        executorService.execute(() ->
+        {
+            Thread.currentThread().setName("Sender");
+            try
+            {
+                Draft draft = outgoingDrafts.take();
+            }
+            catch (InterruptedException e)
+            {
+                // logger
+            }
+            // Send outgoing drafts
         });
     }
 
