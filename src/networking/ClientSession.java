@@ -1,15 +1,20 @@
 package networking;
 
+import jdk.nashorn.internal.ir.Block;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class ClientSession
 {
     //SelectionKey selectionKey;
     SocketChannel channel;
     ByteBuffer buffer;
+    BlockingQueue<Draft> draftQueue;
 
     ClientSession(SocketChannel channel, int bufferSize) throws IOException
     {
@@ -17,11 +22,17 @@ public class ClientSession
         this.channel = channel;
         this.channel.configureBlocking(true);
         this.buffer = ByteBuffer.allocateDirect(bufferSize);
+        this.draftQueue = new LinkedBlockingQueue<>();
     }
 
     public void readDraft() throws IOException
     {
         channel.read(buffer);
         int draftLength = buffer.getInt();
+        if(buffer.limit() >= draftLength - 1)
+        {
+            byte[] draftBytes = new byte[draftLength];
+            draftQueue.add(Draft.fromByteArray(buffer.get(draftBytes).array()));
+        }
     }
 }
