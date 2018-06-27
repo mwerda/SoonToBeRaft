@@ -10,6 +10,9 @@
 //TODO build a logger
 //TODO dumping replicated log to file
 
+import networking.Draft;
+import networking.RaftEntry;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;

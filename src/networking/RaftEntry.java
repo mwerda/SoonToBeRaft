@@ -1,4 +1,4 @@
-/**
+package networking; /**
  * RaftEntry contains a trace of a single change made on replicated state machine.
  * Each RaftEntry is built as follows:
  * |            4 Bytes             |          1 Byte            |   4 Bytes   | variable length |
@@ -11,10 +11,10 @@
 
 import java.nio.ByteBuffer;
 
-class RaftEntry
+public class RaftEntry
 {
     //TODO RaftEntry and Draft enums to class, which will be extended
-    enum OperationType
+    public enum OperationType
     {
         SET((byte) 1),
         REMOVE((byte) 2);
@@ -53,7 +53,7 @@ class RaftEntry
     int value;
     String key;
 
-    RaftEntry(OperationType operationType, int value, String key)
+    public RaftEntry(OperationType operationType, int value, String key)
     {
         this.operationType = operationType;
         this.value = value;
