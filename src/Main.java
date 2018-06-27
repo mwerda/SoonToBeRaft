@@ -1,4 +1,6 @@
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.channels.ServerSocketChannel;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -6,12 +8,19 @@ public class Main
 {
     public static void main(String[] args) throws IOException, InterruptedException
     {
-        RaftNode node = new RaftNode((byte) 1, 40, 3000);
-        node.runNode();
-        while(!node.executorService.isTerminated())
+        ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+        serverSocketChannel.socket().bind(new InetSocketAddress(5000));
+        while(true)
         {
-            Thread.sleep(1000);
+            serverSocketChannel.accept();
         }
+
+//        RaftNode node = new RaftNode((byte) 1, 40, 3000);
+//        node.runNode();
+//        while(!node.executorService.isTerminated())
+//        {
+//            Thread.sleep(1000);
+//        }
 
 //        MulticastReceiver receiver = new MulticastReceiver(5000, "225.4.5.6", 2048);
 //        Thread receiverThread = new Thread(receiver, "Receiver");

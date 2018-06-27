@@ -11,6 +11,8 @@
 //TODO dumping replicated log to file
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.channels.ServerSocketChannel;
 import java.util.LinkedList;
 import java.util.concurrent.*;
 
@@ -37,6 +39,8 @@ class RaftNode
     //ServerSocket socket;
     NodeClock clock;
 
+    ServerSocketChannel serverSocketChannel;
+
     final static long[] ELECTION_TIMEOUT_BOUNDS = {150, 300};
     final static long HEARTBEAT_TIMEOUT = 40;
 
@@ -54,9 +58,13 @@ class RaftNode
         pendingChanges = new LinkedBlockingQueue<>();
         log = new LinkedBlockingQueue<>();
 
-        this.executorService = Executors.newFixedThreadPool(4);
+        this.executorService = Executors.newFixedThreadPool(5);
         //this.socket = new ServerSocket(port);
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
+
+        serverSocketChannel = ServerSocketChannel.open();
+        serverSocketChannel.socket().bind(new InetSocketAddress(5000));
+        //log server started
     }
 
     void runNode()
@@ -69,7 +77,7 @@ class RaftNode
                 if(clock.electionTimeouted())
                 {
                     // TODO
-                    // HandleElectionTimeout()
+                    handleElectionTimeout();
                     clock.resetElectionTimeoutStartMoment();
                 }
 
@@ -116,6 +124,13 @@ class RaftNode
             }
             // Send outgoing drafts
         });
+
+        executorService.execute(() ->
+        {
+            Thread.currentThread().setName("ServerSocketChannel");
+            //while(serverSocketChannel.)
+        });
+
     }
 
     void appendSet(int value, String key)
@@ -133,13 +148,30 @@ class RaftNode
         return new Draft(Draft.DraftType.HEARTBEAT, term, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
     }
 
+    void receiveHeartbeat(byte[] message)
+    {
+
+    }
+
+    void handleElectionTimeout()
+    {
+        role = Role.CANDIDATE;
+        //outgoingDrafts.add(new Draft(Draft.DraftType.REQUEST_VOTE, term))
+    }
+
+    void respondToHeartBeat()
+    {
+
+    }
+
+    void respondToRequestVote()
+    {
+
+    }
+
     void sendHeartbeat()
     {
 
     }
 
-    void receiveHeartbeat(byte[] message)
-    {
-
-    }
 }
