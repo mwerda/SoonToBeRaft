@@ -39,7 +39,7 @@ public class ClientStreamSession
             byte[] draftBytes = new byte[draftLength];
             buffer.get(draftBytes);
             draftQueue.add(Draft.fromByteArray(draftBytes));
-            buffer.compact();
         }
+        buffer.compact();
     }
 }

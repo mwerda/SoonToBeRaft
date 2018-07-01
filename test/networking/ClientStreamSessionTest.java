@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+// Nie zbiera wszystkich Draftów - zostaje coś w buforze?
 class ClientStreamSessionTest
 {
     // Set up connection between two nodes, mock some messages, send them over network and check
@@ -31,6 +32,7 @@ class ClientStreamSessionTest
         ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.socket().bind(new InetSocketAddress(5000));
         ClientStreamSession receiverSession = new ClientStreamSession(serverSocketChannel.accept(), bufferSize);
+        System.out.println("Connection established");
 
         Thread receiverThread = new Thread("ReceiverThread")
         {
@@ -50,6 +52,7 @@ class ClientStreamSessionTest
             }
         };
 
+        // sanity breakpoint
         receiverThread.start();
         int receiverQueueSize = receiverSession.draftQueue.size();
         long eventTime = System.nanoTime();
@@ -58,8 +61,8 @@ class ClientStreamSessionTest
         {
             receiverQueueSize = receiverSession.draftQueue.size();
             elapsedTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - eventTime);
-            System.out.println(elapsedTime);
-            Thread.sleep(5000);
+            Thread.sleep(100);
+            System.out.println(receiverQueueSize);
         }
 
         System.out.println("Performing content check");
