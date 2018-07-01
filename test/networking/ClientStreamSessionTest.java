@@ -38,7 +38,10 @@ class ClientStreamSessionTest
             {
                 try
                 {
-                    receiverSession.readDraft();
+                    while(true)
+                    {
+                        receiverSession.readDraft();
+                    }
                 }
                 catch (IOException e)
                 {
@@ -53,6 +56,7 @@ class ClientStreamSessionTest
         long elapsedTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - eventTime);
         while(!(receiverQueueSize == draftsExpectedCount || elapsedTime >= waitForMessagesTimeCap))
         {
+            receiverQueueSize = receiverSession.draftQueue.size();
             elapsedTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - eventTime);
             System.out.println(elapsedTime);
             Thread.sleep(5000);
