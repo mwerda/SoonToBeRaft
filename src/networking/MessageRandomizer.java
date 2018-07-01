@@ -30,7 +30,8 @@ public class MessageRandomizer
 
     public static Draft generateDraft()
     {
-        Draft.DraftType draftType = Draft.DraftType.fromByte((byte) random.nextInt(Draft.DraftType.values().length));
+        // 1 added as type numbering starts from 1 instead of 0
+        Draft.DraftType draftType = Draft.DraftType.fromByte((byte) (random.nextInt(Draft.DraftType.values().length) + 1));
         byte id = (byte) (random.nextInt(DEFAULT_MAX_ID + 1) + DEFAULT_MIN_ID);
 
         // +1 not used for Integer max value overflow occurence
@@ -56,8 +57,9 @@ public class MessageRandomizer
 
     public static RaftEntry generateRaftEntry()
     {
+        // 1 added as type numbering starts from 1 instead of 0
         RaftEntry.OperationType operationType = RaftEntry.OperationType.fromByte(
-                (byte) (random.nextInt(RaftEntry.OperationType.values().length))
+                (byte) (random.nextInt(RaftEntry.OperationType.values().length) + 1)
         );
         int value = operationType == RaftEntry.OperationType.SET ? random.nextInt() : 0;
         String key = generateString();
