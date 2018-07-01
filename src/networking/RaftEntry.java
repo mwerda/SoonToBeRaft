@@ -1,4 +1,5 @@
-package networking; /**
+package networking;
+/**
  * RaftEntry contains a trace of a single change made on replicated state machine.
  * Each RaftEntry is built as follows:
  * |            4 Bytes             |          1 Byte            |   4 Bytes   | variable length |

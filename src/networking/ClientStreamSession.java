@@ -4,8 +4,6 @@ package networking;
 // Should non-blocking read be more effective?
 // WHat is the thrpughput of current solution?
 
-import jdk.nashorn.internal.ir.Block;
-
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
@@ -13,14 +11,14 @@ import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class ClientSession
+public class ClientStreamSession
 {
     //SelectionKey selectionKey;
     SocketChannel channel;
     ByteBuffer buffer;
     BlockingQueue<Draft> draftQueue;
 
-    ClientSession(SocketChannel channel, int bufferSize) throws IOException
+    ClientStreamSession(SocketChannel channel, int bufferSize) throws IOException
     {
         //this.selectionKey = selectionKey;
         this.channel = channel;
@@ -41,6 +39,7 @@ public class ClientSession
             byte[] draftBytes = new byte[draftLength];
             buffer.get(draftBytes);
             draftQueue.add(Draft.fromByteArray(draftBytes));
+            buffer.compact();
         }
     }
 }

@@ -3,6 +3,8 @@ package networking;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
+//TODO control over Draft size
+
 /**
  * Draft is a protocol utilized by current implementation of Raft algorithm.
  * Draft Heartbeat messages are built as follows:
