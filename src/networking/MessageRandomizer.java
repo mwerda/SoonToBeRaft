@@ -32,12 +32,14 @@ public class MessageRandomizer
     {
         Draft.DraftType draftType = Draft.DraftType.fromByte((byte) random.nextInt(Draft.DraftType.values().length));
         byte id = (byte) (random.nextInt(DEFAULT_MAX_ID + 1) + DEFAULT_MIN_ID);
-        int term = random.nextInt(DEFAULT_MAX_TERM_NUMBER + 1) + DEFAULT_MIN_TERM_NUMBER;
+
+        // +1 not used for Integer max value overflow occurence
+        int term = random.nextInt(DEFAULT_MAX_TERM_NUMBER) + DEFAULT_MIN_TERM_NUMBER;
         RaftEntry[] raftEntries;
 
         if(draftType == Draft.DraftType.HEARTBEAT)
         {
-            int entriesCount = random.nextInt(DEFAULT_MIN_ENTRY_COUNT + 1) + DEFAULT_MAX_ENTRY_COUNT;
+            int entriesCount = random.nextInt(DEFAULT_MAX_ENTRY_COUNT + 1) + DEFAULT_MIN_ENTRY_COUNT;
             raftEntries = new RaftEntry[entriesCount];
             for(int i = 0; i < entriesCount; i++)
             {
