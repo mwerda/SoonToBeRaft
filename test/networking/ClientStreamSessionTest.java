@@ -1,5 +1,6 @@
 package networking;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -21,10 +22,10 @@ class ClientStreamSessionTest
     void testTwoNodesSomeMessages() throws IOException, InterruptedException
     {
         final int bufferSize = 8192;
-        final int draftsExpectedCount = 300;
+        final int draftsExpectedCount = 100000;
         final String hostname = "192.168.1.109";
         final int port = 5000;
-        final int waitForMessagesTimeCap = 30000;
+        final int waitForMessagesTimeCap = 3000000;
 
         // RECEIVER code
 
@@ -66,25 +67,25 @@ class ClientStreamSessionTest
         }
 
         System.out.println("Performing content check");
-        // TODO check
+        Assertions.assertTrue(receiverSession.draftQueue.size() == draftsExpectedCount);
 
         // SENDER code
-        BlockingQueue<Draft> draftsToSend = new LinkedBlockingQueue<>();
-        for(int i = 0; i < draftsExpectedCount; i++)
-        {
-            draftsToSend.add(MessageRandomizer.generateDraft());
-        }
-
-        SocketChannel senderSocket = SocketChannel.open();
-        senderSocket.connect(new InetSocketAddress(hostname, port));
-
-        ByteBuffer senderBuffer = ByteBuffer.allocateDirect(bufferSize);
-        while(draftsToSend.size() > 0)
-        {
-            senderBuffer.put(draftsToSend.poll().toByteArray());
-            senderBuffer.flip();
-            senderSocket.write(senderBuffer);
-            senderBuffer.clear();
-        }
+//        BlockingQueue<Draft> draftsToSend = new LinkedBlockingQueue<>();
+//        for(int i = 0; i < draftsExpectedCount; i++)
+//        {
+//            draftsToSend.add(MessageRandomizer.generateDraft());
+//        }
+//
+//        SocketChannel senderSocket = SocketChannel.open();
+//        senderSocket.connect(new InetSocketAddress(hostname, port));
+//
+//        ByteBuffer senderBuffer = ByteBuffer.allocateDirect(bufferSize);
+//        while(draftsToSend.size() > 0)
+//        {
+//            senderBuffer.put(draftsToSend.poll().toByteArray());
+//            senderBuffer.flip();
+//            senderSocket.write(senderBuffer);
+//            senderBuffer.clear();
+//        }
     }
 }
