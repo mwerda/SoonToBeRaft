@@ -1,3 +1,4 @@
+package obsolete;
 public class Message
 {
     byte[] payload;

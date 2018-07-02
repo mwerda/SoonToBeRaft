@@ -1,4 +1,4 @@
-/**
+package node; /**
  * RaftNode represents a single node in cluster. It orchestrates four distinct threads:
  * 1. Clock, responsible for signalling timeouts on election and heartbeat and measuring elapsed time
  * It checks for timeouts every CLOCK_SLEEP_TIME, by default 1 ms

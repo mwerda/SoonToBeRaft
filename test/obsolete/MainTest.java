@@ -1,8 +1,8 @@
+package obsolete;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
-import java.util.LinkedList;
 
 class MainTest
 {
@@ -123,7 +123,7 @@ class MainTest
         {
             synchronized(pair.sender.lock)
             {
-               pair.sender.lock.wait();
+                pair.sender.lock.wait();
             }
         }
 

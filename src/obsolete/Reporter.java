@@ -1,3 +1,4 @@
+package obsolete;
 class Reporter
 {
     enum OutputType

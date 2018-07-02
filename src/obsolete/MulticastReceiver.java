@@ -1,5 +1,5 @@
+package obsolete;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.*;
 import java.util.Arrays;
 import java.util.EnumSet;
