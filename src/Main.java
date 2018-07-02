@@ -1,3 +1,5 @@
+import networking.RaftEntry;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -19,7 +21,7 @@ public class Main
         byte[] array = buffer.array();
         buffer.clear();
         System.out.println("Sleeping for 10000");
-        Thread.sleep(10000);
+        //Thread.sleep(10000);
         System.out.println("Waking up");
         communicator.read(buffer);
         byte[] array1 = buffer.array();
