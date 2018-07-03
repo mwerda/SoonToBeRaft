@@ -4,9 +4,10 @@ package networking;
 // Should non-blocking read be more effective?
 // WHat is the thrpughput of current solution?
 
+import protocol.Draft;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -15,7 +16,8 @@ public class ClientStreamSession
 {
     //SelectionKey selectionKey;
     SocketChannel channel;
-    ByteBuffer buffer;
+    ByteBuffer receiveBuffer;
+    ByteBuffer sendBuffer;
     BlockingQueue<Draft> draftQueue;
 
     ClientStreamSession(SocketChannel channel, int bufferSize) throws IOException
@@ -23,23 +25,25 @@ public class ClientStreamSession
         //this.selectionKey = selectionKey;
         this.channel = channel;
         this.channel.configureBlocking(true);
-        this.buffer = ByteBuffer.allocateDirect(bufferSize);
-        this.buffer.clear();
+        this.receiveBuffer = ByteBuffer.allocateDirect(bufferSize);
+        this.receiveBuffer.clear();
+        this.sendBuffer = ByteBuffer.allocateDirect(bufferSize);
+        this.sendBuffer.clear();
         this.draftQueue = new LinkedBlockingQueue<>();
     }
 
     public void readDraft() throws IOException
     {
-        channel.read(buffer);
-        buffer.flip();
-        int draftLength = buffer.getInt();
-        buffer.position(0);
-        if(buffer.limit() >= draftLength - 1)
+        channel.read(receiveBuffer);
+        receiveBuffer.flip();
+        int draftLength = receiveBuffer.getInt();
+        receiveBuffer.position(0);
+        if(receiveBuffer.limit() >= draftLength - 1)
         {
             byte[] draftBytes = new byte[draftLength];
-            buffer.get(draftBytes);
+            receiveBuffer.get(draftBytes);
             draftQueue.add(Draft.fromByteArray(draftBytes));
         }
-        buffer.compact();
+        receiveBuffer.compact();
     }
 }

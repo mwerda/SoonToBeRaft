@@ -1,19 +1,18 @@
+/**
+ * Attention required! This test will NOT finish properly unattended. It requires two separate machines.
+ */
 package networking;
-
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import protocol.Draft;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.*;
-
-// Nie zbiera wszystkich Draftów - zostaje coś w buforze?
 class ClientStreamSessionTest
 {
     // Set up connection between two nodes, mock some messages, send them over network and check
@@ -73,7 +72,7 @@ class ClientStreamSessionTest
 //        BlockingQueue<Draft> draftsToSend = new LinkedBlockingQueue<>();
 //        for(int i = 0; i < draftsExpectedCount; i++)
 //        {
-//            draftsToSend.add(MessageRandomizer.generateDraft());
+//            draftsToSend.add(DraftRandomizer.generateDraft());
 //        }
 //
 //        SocketChannel senderSocket = SocketChannel.open();

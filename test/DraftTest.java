@@ -1,5 +1,5 @@
-import networking.Draft;
-import networking.RaftEntry;
+import protocol.Draft;
+import protocol.RaftEntry;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

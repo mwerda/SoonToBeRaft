@@ -10,13 +10,21 @@ package node; /**
 //TODO build a logger
 //TODO dumping replicated log to file
 
-import networking.Draft;
-import networking.RaftEntry;
+import networking.Identity;
+import protocol.Draft;
+import protocol.RaftEntry;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.nio.channels.ServerSocketChannel;
+import java.util.Enumeration;
 import java.util.LinkedList;
+import java.util.Scanner;
 import java.util.concurrent.*;
 
 class RaftNode
@@ -44,12 +52,15 @@ class RaftNode
 
     ServerSocketChannel serverSocketChannel;
 
+    Identity identity;
+    Identity[] peers;
+
     final static long[] ELECTION_TIMEOUT_BOUNDS = {150, 300};
     final static long HEARTBEAT_TIMEOUT = 40;
 
     final static int CLOCK_SLEEP_TIME = 1;
 
-    RaftNode(byte id, int heartbeatPeriod, int port) throws IOException
+    RaftNode(byte id, int heartbeatPeriod, int port, String configFilePath) throws IOException
     {
         this.id = id;
         this.heartbeatPeriod = heartbeatPeriod;
@@ -65,9 +76,13 @@ class RaftNode
         //this.socket = new ServerSocket(port);
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
 
+
+
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.socket().bind(new InetSocketAddress(5000));
         //log server started
+
+        discoverClusterIdentities(configFilePath);
     }
 
     void runNode()
@@ -130,7 +145,7 @@ class RaftNode
 
         executorService.execute(() ->
         {
-            Thread.currentThread().setName("ServerSocketChannel");
+            Thread.currentThread().setName("ConnectionManager");
             //while(serverSocketChannel.)
         });
 
@@ -177,4 +192,69 @@ class RaftNode
 
     }
 
+    //TODO produces identity array containing a null identity identifying this computer
+    private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
+    {
+        String[] interfacesAddresses = getIpAddresses();
+        Identity[] clusterIdentities = getClusterIdentities(configFilePath);
+
+        for(Identity identity : clusterIdentities)
+        {
+            for(String address : interfacesAddresses)
+            {
+                if(address != null && identity != null && address.equals(identity.getIpAddress()))
+                {
+                    this.identity = new Identity(identity);
+                    identity = null;
+                }
+            }
+        }
+        peers = clusterIdentities;
+    }
+
+    private Identity[] getClusterIdentities(String configFilePath) throws FileNotFoundException
+    {
+        LinkedList<Identity> identities = new LinkedList<>();
+
+        File configFile = new File(configFilePath);
+        Scanner inputStream = new Scanner(configFile);
+        while(inputStream.hasNext())
+        {
+            String[] line = inputStream.next().split(",");
+            identities.add(new Identity(line[0], (byte) Integer.parseInt(line[1]), Integer.parseInt(line[2])));
+        }
+        inputStream.close();
+        return (Identity[]) identities.toArray();
+    }
+
+    private static String[] getIpAddresses()
+    {
+        String ip;
+        LinkedList<String> addressesList = new LinkedList<>();
+        try
+        {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements())
+            {
+                NetworkInterface iface = interfaces.nextElement();
+                // filters out 127.0.0.1 and inactive interfaces
+                if (iface.isLoopback() || !iface.isUp())
+                    continue;
+
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while(addresses.hasMoreElements())
+                {
+                    InetAddress addr = addresses.nextElement();
+                    ip = addr.getHostAddress();
+                    addressesList.add(ip);
+                    System.out.println(iface.getDisplayName() + " " + ip);
+                }
+            }
+        }
+        catch (SocketException e)
+        {
+            throw new RuntimeException(e);
+        }
+        return (String[]) addressesList.toArray();
+    }
 }

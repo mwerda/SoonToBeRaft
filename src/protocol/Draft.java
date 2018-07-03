@@ -1,4 +1,4 @@
-package networking;
+package protocol;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;

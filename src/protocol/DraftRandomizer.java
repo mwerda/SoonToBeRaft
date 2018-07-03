@@ -1,12 +1,12 @@
-package networking; /**
+package protocol; /**
  * Both min and max bounds are INCLUSIVE
  */
 
-import networking.Draft;
-import networking.RaftEntry;
+import protocol.Draft;
+import protocol.RaftEntry;
 import java.util.Random;
 
-public class MessageRandomizer
+public class DraftRandomizer
 {
     private final static String CHARSET = "abcdefghijklmnopqrstuvwxyz";
 
