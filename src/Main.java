@@ -15,25 +15,47 @@ public class Main
         ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.socket().bind(new InetSocketAddress(5000));
 
-        SocketChannel communicator = serverSocketChannel.accept();
-        ByteBuffer buffer = ByteBuffer.allocateDirect(2048);
-        communicator.read(buffer);
-        byte[] array = buffer.array();
-        buffer.clear();
-        System.out.println("Sleeping for 10000");
-        //Thread.sleep(10000);
-        System.out.println("Waking up");
-        communicator.read(buffer);
-        byte[] array1 = buffer.array();
+//        SocketChannel communicator = serverSocketChannel.accept();
+//        ByteBuffer buffer = ByteBuffer.allocateDirect(2048);
+//        communicator.read(buffer);
+//        byte[] array = buffer.array();
+//        buffer.clear();
+//        System.out.println("Sleeping for 10000");
+//        Thread.sleep(10000);
+//        System.out.println("Waking up");
+//        communicator.read(buffer);
+//        byte[] array1 = buffer.array();
+//
+//        System.out.println("Read");
 
-        System.out.println("Read");
-
-
-
+//        SocketChannel senderSocket = SocketChannel.open();
+//        senderSocket.connect(new InetSocketAddress("192.168.1.109", 5000));
+//
 //        ByteBuffer senderBuffer = ByteBuffer.allocateDirect(2048);
 //        Draft draft = new Draft(Draft.DraftType.HEARTBEAT, 12, (byte) 15, new RaftEntry[0]);
+//
 //        senderBuffer.put(draft.toByteArray());
 //        senderSocket.write(senderBuffer);
+//
+//        //Thread.sleep(1000);
+//        senderBuffer.put(draft.toByteArray());
+//        senderSocket.write(senderBuffer);
+//        senderBuffer.put(draft.toByteArray());
+//        senderSocket.write(senderBuffer);
+//        //Thread.sleep(10000);
+
+
+
+
+//        ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
+//        serverSocketChannel.socket().bind(new InetSocketAddress(5000));
+//        while(true)
+//        {
+//            serverSocketChannel.accept();
+//        }
+
+
+
 
 
 //        RaftNode node = new RaftNode((byte) 1, 40, 3000);
