@@ -157,4 +157,9 @@ public class Draft
         }
         return true;
     }
+
+    public int getTerm()
+    {
+        return term;
+    }
 }

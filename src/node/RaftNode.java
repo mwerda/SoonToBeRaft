@@ -11,6 +11,7 @@ package node; /**
 //TODO dumping replicated log to file
 //TODO FILE SEPARATOR DEPENDING ON THE OS TYPE!
 //TODO remove id from constructor
+//TODO buffer underflow exception happens randomly - compaction problem?
 
 import networking.Identity;
 import networking.StreamConnectionManager;
@@ -76,7 +77,7 @@ public class RaftNode
         pendingChanges = new LinkedBlockingQueue<>();
         log = new LinkedBlockingQueue<>();
 
-        this.executorService = Executors.newFixedThreadPool(5);
+        this.executorService = Executors.newCachedThreadPool();
         //this.socket = new ServerSocket(port);
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
 
@@ -282,5 +283,10 @@ public class RaftNode
     public void runStreamConnectionManager()
     {
         streamConnectionManager.run();
+    }
+
+    public BlockingQueue<Draft> getReceivedDrafts()
+    {
+        return receivedDrafts;
     }
 }
