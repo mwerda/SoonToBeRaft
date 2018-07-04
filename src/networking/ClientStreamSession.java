@@ -50,6 +50,11 @@ public class ClientStreamSession
         receiveBuffer.compact();
     }
 
+    public void close() throws IOException
+    {
+        this.channel.close();
+    }
+
     public void addToOutgoingDrafts(Draft draft)
     {
         outgoingDrafts.add(draft);

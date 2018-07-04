@@ -62,6 +62,7 @@ public class RaftNode
     public final static int HEARTBEAT_TIMEOUT = 40;
 
     final static int CLOCK_SLEEP_TIME = 1;
+    final static int DEFAULT_BUFFER_SIZE = 8192;
 
     public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath) throws IOException
     {
@@ -81,7 +82,7 @@ public class RaftNode
 
 
         discoverClusterIdentities(configFilePath);
-        streamConnectionManager = new StreamConnectionManager(peers, port);
+        streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE);
         //log server started
         System.out.println();
     }

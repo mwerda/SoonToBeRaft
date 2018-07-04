@@ -1,6 +1,5 @@
 package networking;
 
-import com.sun.deploy.util.SessionState;
 import protocol.Draft;
 
 import java.io.IOException;
@@ -11,25 +10,34 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.Set;
+
+// TODO Reconnets
 
 public class StreamConnectionManager implements Runnable
 {
-    HashMap<Byte, Identity> identityMap;
-    HashMap<Byte, ClientStreamSession> idToPeerSession;
+    HashMap<Byte, Identity> idToIdentityMap;
+    HashMap<Byte, ClientStreamSession> idToPeerSessionMap;
+    HashMap<String, Identity> addressToIdentityMap;
     int port;
+    int bufferSize;
+    int peersCount;
 
     //TODO: think about unifying identities representation as map
-    public StreamConnectionManager(Identity[] identities, int port) throws IOException
+    public StreamConnectionManager(Identity[] identities, int port, int bufferSize) throws IOException
     {
-        identityMap = new HashMap<>();
+        this.idToIdentityMap = new HashMap<>();
+        this.idToPeerSessionMap = new HashMap<>();
+        this.addressToIdentityMap = new HashMap<>();
         for(Identity identity : identities)
         {
-            identityMap.put(identity.id, identity);
+            // TODO Guava offers bidirectional maps
+            idToIdentityMap.put(identity.id, identity);
+            addressToIdentityMap.put(identity.ipAddress, identity);
         }
-        this.idToPeerSession = new HashMap<>();
         this.port = port;
+        this.bufferSize = bufferSize;
+        this.peersCount = identities.length;
     }
 
 
@@ -72,19 +80,29 @@ public class StreamConnectionManager implements Runnable
                                 //TODO serversocket responds before accept?
                                 SocketChannel client = serverSocket.accept();
                                 client.configureBlocking(false);
-                                client.register(selector, SelectionKey.OP_READ);
-                                ClientStreamSession newPeerSession = new ClientStreamSession(client, 8192);
-                                //peerSessions.add(newPeerSession);
 
+                                // If for given ID connection was created before, new connection invalidates the older;
+                                // Thus, channel is closed and replaced
+                                String remoteAddress = ((InetSocketAddress) client.getRemoteAddress()).getAddress().toString().replace("/", "");
+                                byte id = addressToIdentityMap.get(remoteAddress).id;
+                                ClientStreamSession newPeerSession = new ClientStreamSession(client, bufferSize);
+                                if(idToPeerSessionMap.get(id) != null)
+                                {
+                                    idToPeerSessionMap.get(id).close();
+                                    idToPeerSessionMap.remove(id);
+                                }
+                                idToPeerSessionMap.put(id, newPeerSession);
+
+                                client.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, newPeerSession);
                             }
                         }
                         else
                         {
-                            if (key.isReadable())
+                            if(key.isReadable())
                             {
                                 System.out.println();
 
-                            } else if (key.isWritable())
+                            } else if(key.isWritable())
                             {
                                 // a channel is ready for writing
                             }
@@ -112,22 +130,23 @@ public class StreamConnectionManager implements Runnable
 
     public void sendToAll(Draft draft)
     {
-        for(ClientStreamSession peerSession : peerSessions)
-        {
-            peerSession.addToOutgoingDrafts(draft);
-        }
+//        for(ClientStreamSession peerSession : peerSessions)
+//        {
+//            peerSession.addToOutgoingDrafts(draft);
+//        }
     }
 
     public void sendToId(Draft draft, byte id)
     {
         //TODO: less primitive
-        for(ClientStreamSession peerSession : peerSessions)
-        {
-            if(peerSession.id == id)
-            {
-                peerSession.addToOutgoingDrafts(draft);
-                break;
-            }
-        }
+//        for(ClientStreamSession peerSession : peerSessions)
+//        {
+//            if(peerSession.id == id)
+//            {
+//                peerSession.addToOutgoingDrafts(draft);
+//                break;
+//            }
+//        }
     }
+
 }
