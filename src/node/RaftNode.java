@@ -9,8 +9,10 @@ package node; /**
 
 //TODO build a logger
 //TODO dumping replicated log to file
+//TODO FILE SEPARATOR DEPENDING ON THE OS TYPE!
 
 import networking.Identity;
+import networking.StreamConnectionManager;
 import protocol.Draft;
 import protocol.RaftEntry;
 
@@ -27,7 +29,7 @@ import java.util.LinkedList;
 import java.util.Scanner;
 import java.util.concurrent.*;
 
-class RaftNode
+public class RaftNode
 {
     enum Role
     {
@@ -37,7 +39,7 @@ class RaftNode
     }
 
     byte id;
-    int heartbeatPeriod;
+    int heartbeatTimeout;
     int term;
 
     Role role;
@@ -50,20 +52,21 @@ class RaftNode
     //ServerSocket socket;
     NodeClock clock;
 
-    ServerSocketChannel serverSocketChannel;
+    //ServerSocketChannel serverSocketChannel;
+    StreamConnectionManager streamConnectionManager;
 
     Identity identity;
     Identity[] peers;
 
-    final static long[] ELECTION_TIMEOUT_BOUNDS = {150, 300};
-    final static long HEARTBEAT_TIMEOUT = 40;
+    public final static long[] ELECTION_TIMEOUT_BOUNDS = {150, 300};
+    public final static int HEARTBEAT_TIMEOUT = 40;
 
     final static int CLOCK_SLEEP_TIME = 1;
 
-    RaftNode(byte id, int heartbeatPeriod, int port, String configFilePath) throws IOException
+    public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath) throws IOException
     {
         this.id = id;
-        this.heartbeatPeriod = heartbeatPeriod;
+        this.heartbeatTimeout = heartbeatTimeout;
         this.term = 0;
         this.role = Role.FOLLOWER;
 
@@ -77,12 +80,10 @@ class RaftNode
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
 
 
-
-        serverSocketChannel = ServerSocketChannel.open();
-        serverSocketChannel.socket().bind(new InetSocketAddress(5000));
-        //log server started
-
         discoverClusterIdentities(configFilePath);
+        streamConnectionManager = new StreamConnectionManager(peers, port);
+        //log server started
+        System.out.println();
     }
 
     void runNode()
@@ -192,11 +193,10 @@ class RaftNode
 
     }
 
-    //TODO produces identity array containing a null identity identifying this computer
     private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
     {
-        String[] interfacesAddresses = getIpAddresses();
-        Identity[] clusterIdentities = getClusterIdentities(configFilePath);
+        LinkedList<String> interfacesAddresses = getIpAddresses();
+        LinkedList<Identity> clusterIdentities = getClusterIdentities(configFilePath);
 
         for(Identity identity : clusterIdentities)
         {
@@ -205,14 +205,23 @@ class RaftNode
                 if(address != null && identity != null && address.equals(identity.getIpAddress()))
                 {
                     this.identity = new Identity(identity);
-                    identity = null;
+                    clusterIdentities.remove(identity);
+                    break;
                 }
             }
         }
-        peers = clusterIdentities;
+
+        //TODO make a function to cast linked list to array, class as arg
+        Identity[] identityArray = new Identity[clusterIdentities.size()];
+        for(int i = 0; i < clusterIdentities.size(); i++)
+        {
+            identityArray[i] = clusterIdentities.get(i);
+        }
+
+        peers = identityArray;
     }
 
-    private Identity[] getClusterIdentities(String configFilePath) throws FileNotFoundException
+    private LinkedList<Identity> getClusterIdentities(String configFilePath) throws FileNotFoundException
     {
         LinkedList<Identity> identities = new LinkedList<>();
 
@@ -221,13 +230,14 @@ class RaftNode
         while(inputStream.hasNext())
         {
             String[] line = inputStream.next().split(",");
-            identities.add(new Identity(line[0], (byte) Integer.parseInt(line[1]), Integer.parseInt(line[2])));
+            identities.add(new Identity(line[0], Integer.parseInt(line[1]), (byte) Integer.parseInt(line[2])));
         }
+
         inputStream.close();
-        return (Identity[]) identities.toArray();
+        return identities;
     }
 
-    private static String[] getIpAddresses()
+    private static LinkedList<String> getIpAddresses()
     {
         String ip;
         LinkedList<String> addressesList = new LinkedList<>();
@@ -247,7 +257,7 @@ class RaftNode
                     InetAddress addr = addresses.nextElement();
                     ip = addr.getHostAddress();
                     addressesList.add(ip);
-                    System.out.println(iface.getDisplayName() + " " + ip);
+                    //System.out.println(iface.getDisplayName() + " " + ip);
                 }
             }
         }
@@ -255,6 +265,11 @@ class RaftNode
         {
             throw new RuntimeException(e);
         }
-        return (String[]) addressesList.toArray();
+        return addressesList;
+    }
+
+    public void runStreamConnectionManager()
+    {
+        streamConnectionManager.run();
     }
 }

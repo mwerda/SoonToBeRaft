@@ -15,21 +15,24 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class ClientStreamSession
 {
     //SelectionKey selectionKey;
+    byte id;
     SocketChannel channel;
     ByteBuffer receiveBuffer;
     ByteBuffer sendBuffer;
-    BlockingQueue<Draft> draftQueue;
+    BlockingQueue<Draft> receivedDrafts;
+    BlockingQueue<Draft> outgoingDrafts;
 
     ClientStreamSession(SocketChannel channel, int bufferSize) throws IOException
     {
         //this.selectionKey = selectionKey;
         this.channel = channel;
-        this.channel.configureBlocking(true);
+        this.channel.configureBlocking(false);
         this.receiveBuffer = ByteBuffer.allocateDirect(bufferSize);
         this.receiveBuffer.clear();
         this.sendBuffer = ByteBuffer.allocateDirect(bufferSize);
         this.sendBuffer.clear();
-        this.draftQueue = new LinkedBlockingQueue<>();
+        this.receivedDrafts = new LinkedBlockingQueue<>();
+        this.outgoingDrafts = new LinkedBlockingQueue<>();
     }
 
     public void readDraft() throws IOException
@@ -42,8 +45,18 @@ public class ClientStreamSession
         {
             byte[] draftBytes = new byte[draftLength];
             receiveBuffer.get(draftBytes);
-            draftQueue.add(Draft.fromByteArray(draftBytes));
+            receivedDrafts.add(Draft.fromByteArray(draftBytes));
         }
         receiveBuffer.compact();
+    }
+
+    public void addToOutgoingDrafts(Draft draft)
+    {
+        outgoingDrafts.add(draft);
+    }
+
+    public void setId(byte id)
+    {
+        this.id = id;
     }
 }

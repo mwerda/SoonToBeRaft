@@ -6,18 +6,18 @@ public class Identity
     byte id;
     int listeningPort;
 
-    public Identity(String ipAddress, byte id, int listeningPort)
+    public Identity(String ipAddress, int listeningPort, byte id)
     {
         this.ipAddress = ipAddress;
-        this.id = id;
         this.listeningPort = listeningPort;
+        this.id = id;
     }
 
     public Identity(Identity anotherIdentity)
     {
         this.ipAddress = anotherIdentity.ipAddress;
-        this.id = anotherIdentity.id;
         this.listeningPort = anotherIdentity.listeningPort;
+        this.id = anotherIdentity.id;
     }
 
     public String getIpAddress()

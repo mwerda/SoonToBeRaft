@@ -54,19 +54,19 @@ class ClientStreamSessionTest
 
         // sanity breakpoint
         receiverThread.start();
-        int receiverQueueSize = receiverSession.draftQueue.size();
+        int receiverQueueSize = receiverSession.receivedDrafts.size();
         long eventTime = System.nanoTime();
         long elapsedTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - eventTime);
         while(!(receiverQueueSize == draftsExpectedCount || elapsedTime >= waitForMessagesTimeCap))
         {
-            receiverQueueSize = receiverSession.draftQueue.size();
+            receiverQueueSize = receiverSession.receivedDrafts.size();
             elapsedTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - eventTime);
             Thread.sleep(100);
             System.out.println(receiverQueueSize);
         }
 
         System.out.println("Performing content check");
-        Assertions.assertTrue(receiverSession.draftQueue.size() == draftsExpectedCount);
+        Assertions.assertTrue(receiverSession.receivedDrafts.size() == draftsExpectedCount);
 
         // SENDER code
 //        BlockingQueue<Draft> draftsToSend = new LinkedBlockingQueue<>();
