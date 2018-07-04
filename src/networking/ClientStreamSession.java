@@ -19,10 +19,11 @@ public class ClientStreamSession
     SocketChannel channel;
     ByteBuffer receiveBuffer;
     ByteBuffer sendBuffer;
+    // receivedDrafts points to RaftNode's queue
     BlockingQueue<Draft> receivedDrafts;
     BlockingQueue<Draft> outgoingDrafts;
 
-    ClientStreamSession(SocketChannel channel, int bufferSize) throws IOException
+    ClientStreamSession(SocketChannel channel, int bufferSize, BlockingQueue<Draft> receivedDrafts) throws IOException
     {
         //this.selectionKey = selectionKey;
         this.channel = channel;
@@ -31,7 +32,7 @@ public class ClientStreamSession
         this.receiveBuffer.clear();
         this.sendBuffer = ByteBuffer.allocateDirect(bufferSize);
         this.sendBuffer.clear();
-        this.receivedDrafts = new LinkedBlockingQueue<>();
+        this.receivedDrafts = receivedDrafts;
         this.outgoingDrafts = new LinkedBlockingQueue<>();
     }
 
@@ -50,18 +51,32 @@ public class ClientStreamSession
         receiveBuffer.compact();
     }
 
-    public void close() throws IOException
-    {
-        this.channel.close();
-    }
-
-    public void addToOutgoingDrafts(Draft draft)
+    public void addDraftToSend(Draft draft)
     {
         outgoingDrafts.add(draft);
+    }
+
+    public void sendPendingDrafts() throws IOException
+    {
+        if(outgoingDrafts.size() != 0)
+        {
+            while(outgoingDrafts.size() > 0)
+            {
+                sendBuffer.put(outgoingDrafts.poll().toByteArray());
+                sendBuffer.flip();
+                channel.write(sendBuffer);
+                sendBuffer.clear();
+            }
+        }
     }
 
     public void setId(byte id)
     {
         this.id = id;
+    }
+
+    public void close() throws IOException
+    {
+        this.channel.close();
     }
 }

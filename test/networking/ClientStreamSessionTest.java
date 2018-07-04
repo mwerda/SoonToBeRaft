@@ -31,7 +31,7 @@ class ClientStreamSessionTest
         BlockingQueue<Draft> incomingDrafts = new LinkedBlockingQueue<>();
         ServerSocketChannel serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.socket().bind(new InetSocketAddress(5000));
-        ClientStreamSession receiverSession = new ClientStreamSession(serverSocketChannel.accept(), bufferSize);
+        ClientStreamSession receiverSession = new ClientStreamSession(serverSocketChannel.accept(), bufferSize, new LinkedBlockingQueue<Draft>());
         System.out.println("Connection established");
 
         Thread receiverThread = new Thread("ReceiverThread")

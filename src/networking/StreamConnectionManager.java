@@ -11,6 +11,7 @@ import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 
 // TODO Reconnets
 
@@ -19,12 +20,13 @@ public class StreamConnectionManager implements Runnable
     HashMap<Byte, Identity> idToIdentityMap;
     HashMap<Byte, ClientStreamSession> idToPeerSessionMap;
     HashMap<String, Identity> addressToIdentityMap;
+    BlockingQueue<Draft> receivedDrafts;
     int port;
     int bufferSize;
     int peersCount;
 
     //TODO: think about unifying identities representation as map
-    public StreamConnectionManager(Identity[] identities, int port, int bufferSize) throws IOException
+    public StreamConnectionManager(Identity[] identities, int port, int bufferSize, BlockingQueue<Draft> receivedDrafts) throws IOException
     {
         this.idToIdentityMap = new HashMap<>();
         this.idToPeerSessionMap = new HashMap<>();
@@ -38,6 +40,7 @@ public class StreamConnectionManager implements Runnable
         this.port = port;
         this.bufferSize = bufferSize;
         this.peersCount = identities.length;
+        this.receivedDrafts = receivedDrafts;
     }
 
 
@@ -62,6 +65,7 @@ public class StreamConnectionManager implements Runnable
         }
 
 
+        ClientStreamSession session = null;
         while(true)
         {
             try
@@ -84,8 +88,9 @@ public class StreamConnectionManager implements Runnable
                                 // If for given ID connection was created before, new connection invalidates the older;
                                 // Thus, channel is closed and replaced
                                 String remoteAddress = ((InetSocketAddress) client.getRemoteAddress()).getAddress().toString().replace("/", "");
+                                System.out.println("Got a connection from " + remoteAddress);
                                 byte id = addressToIdentityMap.get(remoteAddress).id;
-                                ClientStreamSession newPeerSession = new ClientStreamSession(client, bufferSize);
+                                ClientStreamSession newPeerSession = new ClientStreamSession(client, bufferSize, receivedDrafts);
                                 if(idToPeerSessionMap.get(id) != null)
                                 {
                                     idToPeerSessionMap.get(id).close();
@@ -98,13 +103,13 @@ public class StreamConnectionManager implements Runnable
                         }
                         else
                         {
+                            session = (ClientStreamSession) key.attachment();
                             if(key.isReadable())
                             {
-                                System.out.println();
-
+                                session.readDraft();
                             } else if(key.isWritable())
                             {
-                                // a channel is ready for writing
+                                session.sendPendingDrafts();
                             }
                         }
                     }

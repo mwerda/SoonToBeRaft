@@ -24,4 +24,9 @@ public class Identity
     {
         return ipAddress;
     }
+
+    public byte getId()
+    {
+        return id;
+    }
 }

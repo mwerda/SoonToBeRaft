@@ -10,6 +10,7 @@ package node; /**
 //TODO build a logger
 //TODO dumping replicated log to file
 //TODO FILE SEPARATOR DEPENDING ON THE OS TYPE!
+//TODO remove id from constructor
 
 import networking.Identity;
 import networking.StreamConnectionManager;
@@ -66,7 +67,6 @@ public class RaftNode
 
     public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath) throws IOException
     {
-        this.id = id;
         this.heartbeatTimeout = heartbeatTimeout;
         this.term = 0;
         this.role = Role.FOLLOWER;
@@ -82,12 +82,12 @@ public class RaftNode
 
 
         discoverClusterIdentities(configFilePath);
-        streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE);
+        streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts);
         //log server started
-        System.out.println();
+        this.id = this.identity.getId();
     }
 
-    void runNode()
+    public void runNode()
     {
         executorService.execute(() ->
         {
@@ -122,13 +122,23 @@ public class RaftNode
         executorService.execute(() ->
         {
             Thread.currentThread().setName("Receiver");
-            // Receive messages
+            runStreamConnectionManager();
         });
 
         executorService.execute(() ->
         {
+            // MOCK
             Thread.currentThread().setName("Consumer");
-            // Consume
+            int counter = 0;
+            while(true)
+            {
+                if(!receivedDrafts.isEmpty())
+                {
+                    counter += 1;
+                    System.out.println("Consumed " + counter + " Drafts");
+                    receivedDrafts.poll();
+                }
+            }
         });
 
         executorService.execute(() ->
