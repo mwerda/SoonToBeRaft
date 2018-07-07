@@ -1,7 +1,6 @@
 package networking;
 
 // Questions to answer:
-// Should non-blocking read be more effective?
 // WHat is the thrpughput of current solution?
 
 import protocol.Draft;

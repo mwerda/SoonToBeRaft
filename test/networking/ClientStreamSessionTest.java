@@ -2,13 +2,16 @@
  * Attention required! This test will NOT finish properly unattended. It requires two separate machines.
  */
 package networking;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import protocol.Draft;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -72,7 +75,7 @@ class ClientStreamSessionTest
 //        BlockingQueue<Draft> draftsToSend = new LinkedBlockingQueue<>();
 //        for(int i = 0; i < draftsExpectedCount; i++)
 //        {
-//            draftsToSend.add(DraftRandomizer.generateDraft());
+//            draftsToSend.add(MessageRandomizer.generateDraft());
 //        }
 //
 //        SocketChannel senderSocket = SocketChannel.open();
