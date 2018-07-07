@@ -15,7 +15,7 @@ public class StreamNetwork
 //
 //        while(active)
 //        {
-//            receiverSession.readDraft();
+//            receiverSession.readAvailableDrafts();
 //        }
 //    }
 }

@@ -9,9 +9,7 @@ import protocol.Draft;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -45,7 +43,7 @@ class ClientStreamSessionTest
                 {
                     while(true)
                     {
-                        receiverSession.readDraft();
+                        receiverSession.readAvailableDrafts();
                     }
                 }
                 catch (IOException e)

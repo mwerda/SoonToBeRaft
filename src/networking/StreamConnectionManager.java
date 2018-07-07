@@ -106,7 +106,7 @@ public class StreamConnectionManager implements Runnable
                             session = (ClientStreamSession) key.attachment();
                             if(key.isReadable())
                             {
-                                session.readDraft();
+                                session.readAvailableDrafts();
                             } else if(key.isWritable())
                             {
                                 session.sendPendingDrafts();

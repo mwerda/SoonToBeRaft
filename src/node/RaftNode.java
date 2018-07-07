@@ -60,6 +60,8 @@ public class RaftNode
     Identity identity;
     Identity[] peers;
 
+    MetaCollector metaCollector;
+
     public final static long[] ELECTION_TIMEOUT_BOUNDS = {150, 300};
     public final static int HEARTBEAT_TIMEOUT = 40;
 
@@ -86,6 +88,12 @@ public class RaftNode
         streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts);
         //log server started
         this.id = this.identity.getId();
+    }
+
+    public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
+    {
+        this(id, heartbeatTimeout, port, configFilePath);
+        metaCollector = new MetaCollector(testSize);
     }
 
     public void runNode()
@@ -131,13 +139,18 @@ public class RaftNode
             // MOCK
             Thread.currentThread().setName("Consumer");
             int counter = 0;
+            float meanDraftSize = 0;
             while(true)
             {
                 if(!receivedDrafts.isEmpty())
                 {
+                    Draft draft = receivedDrafts.poll();
+                    meanDraftSize = (counter * meanDraftSize + draft.getSize()) / (counter + 1);
                     counter += 1;
-                    System.out.println("Consumed " + counter + " Drafts");
-                    receivedDrafts.poll();
+                    if(metaCollector != null)
+                    {
+                        metaCollector.markDraftReceived(draft.getTerm());
+                    }
                 }
             }
         });
@@ -260,7 +273,7 @@ public class RaftNode
             {
                 NetworkInterface iface = interfaces.nextElement();
                 // filters out 127.0.0.1 and inactive interfaces
-                if (iface.isLoopback() || !iface.isUp())
+                if(iface.isLoopback() || !iface.isUp())
                     continue;
 
                 Enumeration<InetAddress> addresses = iface.getInetAddresses();

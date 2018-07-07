@@ -14,29 +14,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class StreamConnectionManagerTest
 {
+
     @Test
-    void testSelectors() throws IOException, InterruptedException
+    void test100kMessages() throws IOException, InterruptedException
     {
-        RaftNode node = new RaftNode((byte) 1, 30, 5000, "src/configuration");
+        // Results
+        // 74 s for 90 0000 Drafts
+        // 1131.6947 mean Draft size
+        // 1375.541 kB per s
+        // 100% delivered
+
+        RaftNode node = new RaftNode((byte) 1, 30, 5000, "src/configuration", 100000);
         node.runNode();
         Scanner s = new Scanner(System.in);
         String cmd = s.nextLine();
-        if(cmd == "s")
-        {
-            BlockingQueue<Draft> drafts = node.getReceivedDrafts();
-            int i = 0;
-            for(Draft d : drafts)
-            {
-                if(d.getTerm() != i)
-                {
-                    System.out.println("Expected " + i + " got " + d.getTerm());
-                    i = d.getTerm();
-                }
-                else
-                {
-                    i++;
-                }
-            }
-        }
     }
 }

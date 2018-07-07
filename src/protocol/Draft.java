@@ -162,4 +162,9 @@ public class Draft
     {
         return term;
     }
+
+    public int getSize()
+    {
+        return size;
+    }
 }

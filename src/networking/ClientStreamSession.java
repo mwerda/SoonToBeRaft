@@ -35,19 +35,29 @@ public class ClientStreamSession
         this.outgoingDrafts = new LinkedBlockingQueue<>();
     }
 
-    public void readDraft() throws IOException
+    public void readAvailableDrafts() throws IOException
     {
-        channel.read(receiveBuffer);
-        receiveBuffer.flip();
-        int draftLength = receiveBuffer.getInt();
-        receiveBuffer.position(0);
-        if(receiveBuffer.limit() >= draftLength - 1)
+        boolean readAgain = true;
+        while(readAgain)
         {
-            byte[] draftBytes = new byte[draftLength];
-            receiveBuffer.get(draftBytes);
-            receivedDrafts.add(Draft.fromByteArray(draftBytes));
+            channel.read(receiveBuffer);
+            receiveBuffer.flip();
+            int currentPos = receiveBuffer.position();
+            if(receiveBuffer.limit() - receiveBuffer.position() >= 4)
+            {
+                int draftLength = receiveBuffer.getInt();
+                receiveBuffer.position(currentPos);
+                boolean isEntireDraftReadable = receiveBuffer.limit() - receiveBuffer.position() >= draftLength;
+                if(isEntireDraftReadable)
+                {
+                    byte[] draftBytes = new byte[draftLength];
+                    receiveBuffer.get(draftBytes);
+                    receivedDrafts.add(Draft.fromByteArray(draftBytes));
+                }
+                readAgain = isEntireDraftReadable;
+            }
+            receiveBuffer.compact();
         }
-        receiveBuffer.compact();
     }
 
     public void addDraftToSend(Draft draft)
