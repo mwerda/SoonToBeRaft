@@ -14,7 +14,7 @@ class DraftTest
         raftEntryArray[1] = new RaftEntry(RaftEntry.OperationType.REMOVE, 0, "test2");
         raftEntryArray[2] = new RaftEntry(RaftEntry.OperationType.SET, 200, "test3");
 
-        Draft draftA = new Draft(Draft.DraftType.HEARTBEAT, 10, (byte) 12, raftEntryArray);
+        Draft draftA = new Draft(Draft.DraftType.HEARTBEAT, (byte) 10,  12, 25, 20, 20, raftEntryArray);
         Draft draftB = Draft.fromByteArray(draftA.toByteArray());
         assertTrue(draftA.isEquivalentTo(draftB));
     }
@@ -22,12 +22,12 @@ class DraftTest
     @Test
     void testIsEquivalentTo()
     {
-        Draft draftA = new Draft(Draft.DraftType.HEARTBEAT, 10, (byte) 12, new RaftEntry[0]);
-        Draft draftB = new Draft(Draft.DraftType.HEARTBEAT, 10, (byte) 12, new RaftEntry[0]);
+        Draft draftA = new Draft(Draft.DraftType.HEARTBEAT, (byte) 10,12, 10, 10, 10, new RaftEntry[0]);
+        Draft draftB = new Draft(Draft.DraftType.HEARTBEAT, (byte) 10, 12, 10, 10, 10, new RaftEntry[0]);
         assertTrue(draftA.isEquivalentTo(draftB));
         assertTrue(draftB.isEquivalentTo(draftA));
 
-        Draft draftC = new Draft(Draft.DraftType.REQUEST_VOTE, 10, (byte) 12, new RaftEntry[0]);
+        Draft draftC = new Draft(Draft.DraftType.REQUEST_VOTE, (byte) 10, 12, 10, 10, 10, new RaftEntry[0]);
         assertFalse(draftA.isEquivalentTo(draftC));
         assertFalse(draftC.isEquivalentTo(draftA));
     }

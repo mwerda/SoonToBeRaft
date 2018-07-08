@@ -3,17 +3,20 @@ package protocol;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
-//TODO control over Draft size
-
 /**
  * Draft is a protocol utilized by current implementation of Raft algorithm.
  * Draft Heartbeat messages are built as follows:
  *
- * |  4 Bytes   |        1 Byte          |   4 Bytes   |  1 Byte   |          4 Bytes         | variable length |
- * |------------|------------------------|-------------|-----------|--------------------------|-----------------|
- * | Draft size | Draft type declaration | Term number | Leader ID | No of RaftEntry elements | RaftEntry array |
+ *  ___________________________________________________________________________________________________________________________________________________________________
+ * |                     CURRENT MESSAGE METADATA                                 |   PREVIOUS MESSAGE COMPLIANCE CHECK   |           STATE MACHINE PAYLOAD            |
+ * |______________________________________________________________________________|_______________________________________|____________________________________________|
+ * |  4 Bytes   |        1 Byte          |   4 Bytes   |  1 Byte   |   4 Bytes    |      4 Bytes     |       4 Bytes      |          4 Bytes         | variable length |
+ * |------------|------------------------|-------------|-----------|--------------|------------------|--------------------|--------------------------|-----------------|
+ * | Draft size | Draft type declaration | Term number | Leader ID | Draft number | Known Draft term | Known Draft number | No of RaftEntry elements | RaftEntry array |
+ * |-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
  *
- * See RaftEntry javadoc for further explanation on how it is encapsulated in Draft
+ * Overall 14 bytes at minimum. See RaftEntry javadoc for further explanation on how it is encapsulated in Draft.
+ * 4 bytes describing Draft number are enough for 397 hours of communication with 1500 new Drafts emerging every second.
  */
 public class Draft
 {
@@ -21,13 +24,19 @@ public class Draft
     private static final int BYTES_PER_MESSAGE_TYPE = 1;
     private static final int BYTES_PER_TERM = Integer.SIZE / Byte.SIZE;
     private static final int BYTES_PER_LEADER_ID = 1;
+    private static final int BYTES_PER_DRAFT_NUMBER = Integer.SIZE / Byte.SIZE;
+    private static final int BYTES_PER_KNOWN_TERM_NUMBER = Integer.SIZE / Byte.SIZE;
+    private static final int BYTES_PER_KNOWN_DRAFT_NUMBER = Integer.SIZE / Byte.SIZE;
     private static final int BYTES_PER_ENTRIES_COUNT = Integer.SIZE / Byte.SIZE;
 
     private static final int POSITION_SIZE = 0;
     private static final int POSITION_MESSAGE_TYPE = POSITION_SIZE + BYTES_PER_SIZE;
-    private static final int POSITION_TERM = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
-    private static final int POSITION_LEADER_ID = POSITION_TERM + BYTES_PER_TERM;
-    private static final int POSITION_ENTRIES_COUNT = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
+    private static final int POSITION_LEADER_ID = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
+    private static final int POSITION_TERM = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
+    private static final int POSITION_DRAFT_NUMBER = POSITION_TERM + BYTES_PER_TERM;
+    private static final int POSITION_KNOWN_TERM_NUMBER = POSITION_DRAFT_NUMBER + BYTES_PER_DRAFT_NUMBER;
+    private static final int POSITION_KNOWN_DRAFT_NUMBER = POSITION_KNOWN_TERM_NUMBER + BYTES_PER_KNOWN_TERM_NUMBER;
+    private static final int POSITION_ENTRIES_COUNT = POSITION_KNOWN_DRAFT_NUMBER + BYTES_PER_KNOWN_DRAFT_NUMBER;
     private static final int POSITION_RAFT_ENTRIES = POSITION_ENTRIES_COUNT + BYTES_PER_ENTRIES_COUNT;
 
     public enum DraftType
@@ -63,12 +72,15 @@ public class Draft
 
     private int size;
     private DraftType draftType;
-    private int term;
     private byte leaderID;
+    private int term;
+    private int draftNumber;
+    private int knownTerm;
+    private int knownDraftNumber;
     private RaftEntry[] raftEntries;
     private int entriesCount;
 
-    public Draft(DraftType draftType, int term, byte leaderID, RaftEntry[] raftEntries)
+    public Draft(DraftType draftType, byte leaderID, int term, int draftNumber, int knownTerm, int knownDraftNumber, RaftEntry[] raftEntries)
     {
         int aggregatedEntriesSize = 0;
         for(RaftEntry entry : raftEntries)
@@ -80,12 +92,18 @@ public class Draft
                 + BYTES_PER_MESSAGE_TYPE
                 + BYTES_PER_TERM
                 + BYTES_PER_LEADER_ID
+                + BYTES_PER_DRAFT_NUMBER
+                + BYTES_PER_KNOWN_TERM_NUMBER
+                + BYTES_PER_KNOWN_DRAFT_NUMBER
                 + BYTES_PER_ENTRIES_COUNT
                 + aggregatedEntriesSize;
 
         this.draftType = draftType;
         this.term = term;
         this.leaderID = leaderID;
+        this.draftNumber = draftNumber;
+        this.knownTerm = knownTerm;
+        this.knownDraftNumber = knownDraftNumber;
         this.raftEntries = raftEntries;
         this.entriesCount = raftEntries.length;
     }
@@ -93,8 +111,11 @@ public class Draft
     public static Draft fromByteArray(byte[] array)
     {
         DraftType draftType = DraftType.fromByte(array[POSITION_MESSAGE_TYPE]);
-        int term = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_TERM, POSITION_TERM + BYTES_PER_TERM)).getInt();
         byte leaderID = array[POSITION_LEADER_ID];
+        int term = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_TERM, POSITION_TERM + BYTES_PER_TERM)).getInt();
+        int draftNumber = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_DRAFT_NUMBER, POSITION_DRAFT_NUMBER + BYTES_PER_DRAFT_NUMBER)).getInt();
+        int knownTerm = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_KNOWN_TERM_NUMBER, POSITION_KNOWN_TERM_NUMBER + BYTES_PER_KNOWN_TERM_NUMBER)).getInt();
+        int knownDraftNumber = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_KNOWN_DRAFT_NUMBER, POSITION_KNOWN_DRAFT_NUMBER + BYTES_PER_KNOWN_DRAFT_NUMBER)).getInt();
         int entriesCount = ByteBuffer.wrap(
                 Arrays.copyOfRange(array, POSITION_ENTRIES_COUNT, POSITION_ENTRIES_COUNT + BYTES_PER_ENTRIES_COUNT)
         ).getInt();
@@ -122,13 +143,21 @@ public class Draft
             decodedEntries[i] = new RaftEntry(operationType, value, key);
             currentPos = frameStartingPos + frameLength;
         }
-        return new Draft(draftType, term, leaderID, decodedEntries);
+        return new Draft(draftType, leaderID, term, draftNumber, knownTerm, knownDraftNumber, decodedEntries);
     }
 
     public byte[] toByteArray()
     {
         ByteBuffer byteBuffer = ByteBuffer.allocate(size);
-        byteBuffer.putInt(size).put(draftType.getValue()).putInt(term).put(leaderID).putInt(entriesCount);
+        byteBuffer
+                .putInt(size)
+                .put(draftType.getValue())
+                .put(leaderID)
+                .putInt(term)
+                .putInt(draftNumber)
+                .putInt(knownTerm)
+                .putInt(knownDraftNumber)
+                .putInt(entriesCount);
 
         for(RaftEntry entry : raftEntries)
         {
@@ -145,6 +174,9 @@ public class Draft
             && this.draftType == comparedDraft.draftType
             && this.term == comparedDraft.term
             && this.leaderID == comparedDraft.leaderID
+            && this.draftNumber == comparedDraft.draftNumber
+            && this.knownTerm == comparedDraft.knownTerm
+            && this.knownDraftNumber == comparedDraft.knownDraftNumber
             && this.entriesCount == comparedDraft.entriesCount;
 
         if(!shallowEquivalence)
@@ -166,5 +198,20 @@ public class Draft
     public int getSize()
     {
         return size;
+    }
+
+    public boolean isHeartbeat()
+    {
+        return draftType == DraftType.HEARTBEAT;
+    }
+
+    public boolean isVoteForCandidate()
+    {
+        return draftType == DraftType.VOTE_FOR_CANDIDATE;
+    }
+
+    public boolean isVoteRequest()
+    {
+        return draftType == DraftType.REQUEST_VOTE;
     }
 }

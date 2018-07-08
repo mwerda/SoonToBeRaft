@@ -135,10 +135,10 @@ public class StreamConnectionManager implements Runnable
 
     public void sendToAll(Draft draft)
     {
-//        for(ClientStreamSession peerSession : peerSessions)
-//        {
-//            peerSession.addToOutgoingDrafts(draft);
-//        }
+        for(Byte key : idToPeerSessionMap.keySet())
+        {
+            idToPeerSessionMap.get(key).addDraftToSend(draft);
+        }
     }
 
     public void sendToId(Draft draft, byte id)

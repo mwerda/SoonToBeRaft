@@ -22,10 +22,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.nio.channels.ServerSocketChannel;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.Scanner;
@@ -42,7 +40,11 @@ public class RaftNode
 
     byte id;
     int heartbeatTimeout;
-    int term;
+    int nodeTerm;
+    byte leaderId;
+
+    int knownTerm;
+    int knownDraftNumber;
 
     Role role;
     LinkedList<RaftEntry> raftEntries;
@@ -68,10 +70,11 @@ public class RaftNode
     final static int CLOCK_SLEEP_TIME = 1;
     final static int DEFAULT_BUFFER_SIZE = 8192;
 
+    //TODO id never used
     public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath) throws IOException
     {
         this.heartbeatTimeout = heartbeatTimeout;
-        this.term = 0;
+        this.nodeTerm = 0;
         this.role = Role.FOLLOWER;
 
         receivedDrafts = new LinkedBlockingQueue<>();
@@ -88,6 +91,10 @@ public class RaftNode
         streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts);
         //log server started
         this.id = this.identity.getId();
+
+        this.leaderId = -1;
+        this.knownTerm = 0;
+        this.knownDraftNumber = 0;
     }
 
     public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
@@ -138,42 +145,74 @@ public class RaftNode
         {
             // MOCK
             Thread.currentThread().setName("Consumer");
-            int counter = 0;
-            float meanDraftSize = 0;
             while(true)
             {
                 if(!receivedDrafts.isEmpty())
                 {
                     Draft draft = receivedDrafts.poll();
-                    meanDraftSize = (counter * meanDraftSize + draft.getSize()) / (counter + 1);
-                    counter += 1;
                     if(metaCollector != null)
                     {
                         metaCollector.markDraftReceived(draft.getTerm());
+                        metaCollector.tickMeanValue(draft.getSize());
+                    }
+
+                    if(draft.getTerm() < getNodeTerm())
+                    {
+                        continue;
+                    }
+                    else
+                    {
+                        if(draft.getTerm() > getNodeTerm())
+                        {
+                            setNodeTerm(draft.getTerm());
+                        }
+                    }
+
+
+                    if(draft.isHeartbeat())
+                    {
+                        processHeartbeat(draft);
+                    }
+                    else if(draft.isVoteForCandidate())
+                    {
+                        //processVoteForCandidate(draft);
+                    }
+                    else if(draft.isVoteRequest())
+                    {
+                        //processVoteRequest(draft);
                     }
                 }
             }
         });
 
-        executorService.execute(() ->
-        {
-            Thread.currentThread().setName("Sender");
-            try
-            {
-                Draft draft = outgoingDrafts.take();
-            }
-            catch (InterruptedException e)
-            {
-                // logger
-            }
-            // Send outgoing drafts
-        });
+//        executorService.execute(() ->
+//        {
+//            Thread.currentThread().setName("Sender");
+//            try
+//            {
+//                Draft draft = outgoingDrafts.take();
+//            }
+//            catch (InterruptedException e)
+//            {
+//                // logger
+//            }
+//            // Send outgoing drafts
+//        });
 
         executorService.execute(() ->
         {
             Thread.currentThread().setName("ConnectionManager");
             //while(serverSocketChannel.)
         });
+
+    }
+
+    private void processHeartbeat(Draft draft)
+    {
+        if(!isFollower())
+        {
+            setRole(Role.FOLLOWER);
+        }
 
     }
 
@@ -187,35 +226,17 @@ public class RaftNode
         raftEntries.add(new RaftEntry(RaftEntry.OperationType.REMOVE, 0, key));
     }
 
-    Draft prepareHeartbeatDraft()
-    {
-        return new Draft(Draft.DraftType.HEARTBEAT, term, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
-    }
-
-    void receiveHeartbeat(byte[] message)
-    {
-
-    }
+//    Draft prepareHeartbeatDraft()
+//    {
+//        //return new Draft(Draft.DraftType.HEARTBEAT, nodeTerm, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
+//    }
 
     void handleElectionTimeout()
     {
         role = Role.CANDIDATE;
-        //outgoingDrafts.add(new Draft(Draft.DraftType.REQUEST_VOTE, term))
-    }
-
-    void respondToHeartBeat()
-    {
-
-    }
-
-    void respondToRequestVote()
-    {
-
-    }
-
-    void sendHeartbeat()
-    {
-
+        //Draft voteRequest = new Draft(Draft.DraftType.REQUEST_VOTE, getNodeTerm(), getId(), null);
+        //streamConnectionManager.sendToAll(voteRequest);
+        //outgoingDrafts.add(new Draft(Draft.DraftType.REQUEST_VOTE, nodeTerm))
     }
 
     private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
@@ -282,7 +303,6 @@ public class RaftNode
                     InetAddress addr = addresses.nextElement();
                     ip = addr.getHostAddress();
                     addressesList.add(ip);
-                    //System.out.println(iface.getDisplayName() + " " + ip);
                 }
             }
         }
@@ -302,4 +322,49 @@ public class RaftNode
     {
         return receivedDrafts;
     }
+
+    public int getNodeTerm()
+    {
+        return nodeTerm;
+    }
+
+    public byte getId()
+    {
+        return id;
+    }
+
+    public void setNodeTerm(int nodeTerm)
+    {
+        this.nodeTerm = nodeTerm;
+    }
+
+    public Role getRole()
+    {
+        return role;
+    }
+
+    public void setRole(Role role)
+    {
+        this.role = role;
+    }
+
+    public boolean isFollower()
+    {
+        return role == Role.FOLLOWER;
+    }
+
+    public boolean isCandidate()
+    {
+        return role == Role.CANDIDATE;
+    }
+
+    public boolean isLeader()
+    {
+        return role == Role.LEADER;
+    }
+
+//    private Draft draftHeartbeat()
+//    {
+//        return new Draft(Draft.DraftType.HEARTBEAT, nodeTerm, leaderId, )
+//    }
 }

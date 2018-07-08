@@ -36,6 +36,9 @@ public class DraftRandomizer
 
         // +1 not used for Integer max value overflow occurence
         int term = random.nextInt(DEFAULT_MAX_TERM_NUMBER) + DEFAULT_MIN_TERM_NUMBER;
+        int draftNumber = random.nextInt(DEFAULT_MAX_TERM_NUMBER) + DEFAULT_MIN_TERM_NUMBER;
+        int knownTerm = random.nextInt(DEFAULT_MAX_TERM_NUMBER) + DEFAULT_MIN_TERM_NUMBER;
+        int knownDraftNumber = random.nextInt(DEFAULT_MAX_TERM_NUMBER) + DEFAULT_MIN_TERM_NUMBER;
         RaftEntry[] raftEntries;
 
         if(draftType == Draft.DraftType.HEARTBEAT)
@@ -52,7 +55,7 @@ public class DraftRandomizer
             raftEntries = new RaftEntry[0];
         }
 
-        return new Draft(draftType, term, id, raftEntries);
+        return new Draft(draftType, id, term, draftNumber, knownTerm, knownDraftNumber, raftEntries);
     }
 
     public static RaftEntry generateRaftEntry()
