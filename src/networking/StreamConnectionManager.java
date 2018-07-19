@@ -3,18 +3,19 @@ package networking;
 import protocol.Draft;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
+import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
+import org.apache.log4j.Logger;
 
 // TODO Reconnets
 
 public class StreamConnectionManager implements Runnable
 {
+    final Logger logger = Logger.getLogger(StreamConnectionManager.class);
+
     HashMap<Byte, Identity> idToIdentityMap;
     HashMap<Byte, ClientStreamSession> idToPeerSessionMap;
     HashMap<String, Identity> addressToIdentityMap;
@@ -28,6 +29,7 @@ public class StreamConnectionManager implements Runnable
     //TODO: think about unifying identities representation as map
     public StreamConnectionManager(Identity[] identities, int port, int bufferSize, BlockingQueue<Draft> receivedDrafts) throws IOException
     {
+        logger.info("[SET-UP] Building connection manager");
         this.idToIdentityMap = new HashMap<>();
         this.idToPeerSessionMap = new HashMap<>();
         this.addressToIdentityMap = new HashMap<>();
@@ -74,7 +76,32 @@ public class StreamConnectionManager implements Runnable
             {
                 if(!peersConnected)
                 {
-                    establishConnectionWithPeers();
+                    Thread t = new Thread(() ->
+                    {
+                        logger.info("[SET-UP] ConnManager started a new thread to connect with peers");
+                        try
+                        {
+                            establishConnectionWithPeers();
+                            peersConnected = true;
+                        }
+                        catch (IOException | InterruptedException e)
+                        {
+                            e.printStackTrace();
+                        }
+                        logger.info("[SET-UP] ConnManager successfully connected with peers");
+                    });
+
+                    t.start();
+
+//                    try
+//                    {
+//                        establishConnectionWithPeers();
+//                        peersConnected = true;
+//                    }
+//                    catch(Exception e)
+//                    {
+//                        logger.error("Cannot establish connections");
+//                    }
                 }
 
                 if(selector.select() != 0)
@@ -95,7 +122,7 @@ public class StreamConnectionManager implements Runnable
                                 // If for given ID connection was created before, new connection invalidates the older;
                                 // Thus, channel is closed and replaced
                                 String remoteAddress = ((InetSocketAddress) client.getRemoteAddress()).getAddress().toString().replace("/", "");
-                                System.out.println("Got a connection from " + remoteAddress);
+                                logger.info("[N] Incoming connection from " + remoteAddress);
                                 byte id = addressToIdentityMap.get(remoteAddress).id;
                                 ClientStreamSession newPeerSession = new ClientStreamSession(client, bufferSize, receivedDrafts);
                                 if(idToPeerSessionMap.get(id) != null)
@@ -161,10 +188,11 @@ public class StreamConnectionManager implements Runnable
 //        }
     }
 
-    private void establishConnectionWithPeers() throws IOException
+    private void establishConnectionWithPeers() throws IOException, InterruptedException
     {
         for(Identity identity : identities)
         {
+            //TODO idToPeerSessionMap race condition may apply
             if(idToPeerSessionMap.get(identity.id) == null)
             {
                 tryEstablishConnection(identity);
@@ -172,10 +200,24 @@ public class StreamConnectionManager implements Runnable
         }
     }
 
-    private void tryEstablishConnection(Identity identity) throws IOException
+    private void tryEstablishConnection(Identity identity) throws IOException, InterruptedException
     {
         SocketChannel senderSocket = SocketChannel.open();
-        senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
+        boolean connected = false;
+        while(!connected)
+        {
+            try
+            {
+                senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
+                connected = true;
+            }
+            catch(ConnectException | ClosedChannelException ce)
+            {
+                //System.out.println(ce);
+                Thread.sleep(50);
+            }
+        }
+        logger.info("[N] Established connection with " + identity.ipAddress);
         ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
         idToPeerSessionMap.put(identity.id, newPeerSession);
     }

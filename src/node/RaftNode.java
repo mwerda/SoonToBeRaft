@@ -104,14 +104,11 @@ public class RaftNode
         log = new LinkedBlockingQueue<>();
 
         this.executorService = Executors.newCachedThreadPool();
-        //this.socket = new ServerSocket(port);
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
-
 
         this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath);
         streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts);
-        //log server started
         this.id = this.identity.getId();
 
         logger.info("[SET-UP] RaftNode was built, id: " + this.id);
