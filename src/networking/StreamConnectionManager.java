@@ -113,7 +113,7 @@ public class StreamConnectionManager implements Runnable
         {
             try
             {
-                if(selector.select() != 0)
+                if(selector.select(100) != 0)
                 {
                     Set<SelectionKey> selectedKeys = selector.selectedKeys();
                     Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
@@ -141,7 +141,6 @@ public class StreamConnectionManager implements Runnable
                                 }
                                 idToPeerSessionMap.put(id, newPeerSession);
                                 connectedPeerCount += 1;
-
                                 client.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, newPeerSession);
                             }
                         }
@@ -151,7 +150,8 @@ public class StreamConnectionManager implements Runnable
                             if(key.isReadable())
                             {
                                 session.readAvailableDrafts();
-                            } else if(key.isWritable())
+                            }
+                            else if(key.isWritable())
                             {
                                 session.sendPendingDrafts();
                             }
@@ -219,7 +219,7 @@ public class StreamConnectionManager implements Runnable
             try
             {
                 senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
-                logger.info("[N] Established connection with " + identity.ipAddress);
+                logger.info("[N] Connected to " + identity.ipAddress);
                 ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
                 senderSocket.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, newPeerSession);
                 idToPeerSessionMap.put(identity.id, newPeerSession);

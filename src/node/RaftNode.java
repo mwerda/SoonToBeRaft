@@ -39,7 +39,7 @@ public class RaftNode
 
     final Logger logger = Logger.getLogger(RaftNode.class);
 
-    public final static long[] ELECTION_TIMEOUT_BOUNDS = {20000, 30000};//{150, 300};
+    public final static long[] ELECTION_TIMEOUT_BOUNDS = {8000, 12000};//{150, 300};
     public final static int HEARTBEAT_TIMEOUT = 40;
     final static int CLOCK_SLEEP_TIME = 1;
     final static int DEFAULT_BUFFER_SIZE = 8192;
@@ -104,13 +104,12 @@ public class RaftNode
         log = new LinkedBlockingQueue<>();
 
         this.executorService = Executors.newCachedThreadPool();
-        this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
 
         this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath);
         streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts);
         this.id = this.identity.getId();
-
+        this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
         logger.info("[SET-UP] RaftNode was built, id: " + this.id);
     }
 
@@ -227,7 +226,7 @@ public class RaftNode
         executorService.execute(() ->
         {
             Thread.currentThread().setName("ConnectionManager");
-            //while(serverSocketChannel.)
+            runStreamConnectionManager();
         });
 
     }
