@@ -20,7 +20,7 @@ class ClientStreamSessionTest
     void testTwoNodesSomeMessages() throws IOException, InterruptedException
     {
         final int bufferSize = 8192;
-        final int draftsExpectedCount = 10000;
+        final int draftsExpectedCount = 100000;
         final String hostname = "192.168.1.109";
         final int port = 5000;
         final int waitForMessagesTimeCap = 30000;
@@ -65,7 +65,9 @@ class ClientStreamSessionTest
         BlockingQueue<Draft> draftsToSend = new LinkedBlockingQueue<>();
         for(int i = 0; i < draftsExpectedCount; i++)
         {
-            draftsToSend.add(MessageRandomizer.generateDraft());
+            Draft d = MessageRandomizer.generateDraft();
+            d.setTerm(i);
+            draftsToSend.add(d);
         }
 
         SocketChannel senderSocket = SocketChannel.open();
@@ -74,7 +76,7 @@ class ClientStreamSessionTest
         System.out.println(senderSocket.isConnected());
         System.out.println(senderSocket);
         System.out.println();
-
+        //Thread.sleep(1000);
         // sanity breakpoint
         ByteBuffer senderBuffer = ByteBuffer.allocateDirect(bufferSize);
         while(draftsToSend.size() > 0)
@@ -84,11 +86,11 @@ class ClientStreamSessionTest
             senderSocket.write(senderBuffer);
             senderBuffer.clear();
 
-            if(draftsToSend.size() % 10 == 0)
+            if(draftsToSend.size() % 100 == 0)
             {
                 System.out.println(draftsToSend.size() + " left to send");
             }
         }
-        Thread.sleep(100000);
+        Thread.sleep(1000000);
     }
 }

@@ -157,4 +157,9 @@ public class Draft
         }
         return true;
     }
+
+    public void setTerm(int termValue)
+    {
+        this.term = termValue;
+    }
 }
