@@ -9,9 +9,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class RaftNodeTest
 {
     @Test
-    void testElectionTimeout() throws IOException
+    void testElectionTimeout() throws IOException, InterruptedException
     {
         RaftNode node = new RaftNode();
         node.runNode();
+        Thread.sleep(100000);
     }
 }
