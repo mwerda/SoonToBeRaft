@@ -199,7 +199,9 @@ public class StreamConnectionManager implements Runnable
             try
             {
                 senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
-
+                logger.info("[N] Established connection with " + identity.ipAddress);
+                ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
+                idToPeerSessionMap.put(identity.id, newPeerSession);
                 connected = true;
             }
             catch(ConnectException | ClosedChannelException ce)
@@ -208,8 +210,5 @@ public class StreamConnectionManager implements Runnable
                 Thread.sleep(50);
             }
         }
-        logger.info("[N] Established connection with " + identity.ipAddress);
-        ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
-        idToPeerSessionMap.put(identity.id, newPeerSession);
     }
 }
