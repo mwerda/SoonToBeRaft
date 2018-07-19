@@ -45,8 +45,24 @@ public class StreamConnectionManager implements Runnable
         this.peerCount = identities.length;
         this.receivedDrafts = receivedDrafts;
         this.peersConnected = false;
-    }
 
+        Thread t = new Thread(() ->
+        {
+            logger.info("[SET-UP] ConnManager started a new thread to connect with peers");
+            try
+            {
+                establishConnectionWithPeers();
+                peersConnected = true;
+            }
+            catch (IOException | InterruptedException e)
+            {
+                e.printStackTrace();
+            }
+            logger.info("[SET-UP] ConnManager successfully connected with peers");
+        });
+
+        t.start();
+    }
 
     @Override
     public void run()
@@ -74,36 +90,6 @@ public class StreamConnectionManager implements Runnable
         {
             try
             {
-                if(!peersConnected)
-                {
-                    Thread t = new Thread(() ->
-                    {
-                        logger.info("[SET-UP] ConnManager started a new thread to connect with peers");
-                        try
-                        {
-                            establishConnectionWithPeers();
-                            peersConnected = true;
-                        }
-                        catch (IOException | InterruptedException e)
-                        {
-                            e.printStackTrace();
-                        }
-                        logger.info("[SET-UP] ConnManager successfully connected with peers");
-                    });
-
-                    t.start();
-
-//                    try
-//                    {
-//                        establishConnectionWithPeers();
-//                        peersConnected = true;
-//                    }
-//                    catch(Exception e)
-//                    {
-//                        logger.error("Cannot establish connections");
-//                    }
-                }
-
                 if(selector.select() != 0)
                 {
                     Set<SelectionKey> selectedKeys = selector.selectedKeys();
