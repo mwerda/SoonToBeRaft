@@ -24,6 +24,7 @@ public class StreamConnectionManager implements Runnable
     int port;
     int bufferSize;
     int peerCount;
+    int connectedPeerCount;
     boolean peersConnected;
 
     //TODO: think about unifying identities representation as map
@@ -44,6 +45,8 @@ public class StreamConnectionManager implements Runnable
         this.bufferSize = bufferSize;
         this.peerCount = identities.length;
         this.receivedDrafts = receivedDrafts;
+        // TODO multithreading race condition
+        this.connectedPeerCount = 0;
         this.peersConnected = false;
 
         Thread t = new Thread(() ->
@@ -117,6 +120,7 @@ public class StreamConnectionManager implements Runnable
                                     idToPeerSessionMap.remove(id);
                                 }
                                 idToPeerSessionMap.put(id, newPeerSession);
+                                connectedPeerCount += 1;
 
                                 client.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, newPeerSession);
                             }
@@ -190,11 +194,12 @@ public class StreamConnectionManager implements Runnable
     {
         SocketChannel senderSocket = SocketChannel.open();
         boolean connected = false;
-        while(!connected)
+        while(!(connected || connectedPeerCount == peerCount))
         {
             try
             {
                 senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
+
                 connected = true;
             }
             catch(ConnectException | ClosedChannelException ce)
