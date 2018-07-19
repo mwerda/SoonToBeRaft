@@ -24,10 +24,9 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
-import java.util.Enumeration;
-import java.util.LinkedList;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.*;
+import org.apache.log4j.Logger;
 
 public class RaftNode
 {
@@ -38,19 +37,29 @@ public class RaftNode
         LEADER
     }
 
+    //final static Logger logger = Logger.getLogger(RaftNode.class);
+
+    boolean startedElection = false;
+
     byte id;
     int heartbeatTimeout;
     int nodeTerm;
+    int draftNumber;
     byte leaderId;
+
+    int[] votedFor;
+    HashMap<Byte, Boolean> votesReceived;
 
     int knownTerm;
     int knownDraftNumber;
 
+    int nodesInCluster;
+
     Role role;
-    LinkedList<RaftEntry> raftEntries;
+    BlockingQueue<RaftEntry> raftEntries;
     BlockingQueue<Draft> receivedDrafts;
     BlockingQueue<Draft> outgoingDrafts;
-    BlockingQueue<RaftEntry> pendingChanges;
+    BlockingQueue<RaftEntry> proposedDrafts;
     BlockingQueue<RaftEntry> log;
     ExecutorService executorService;
     //ServerSocket socket;
@@ -69,6 +78,16 @@ public class RaftNode
 
     final static int CLOCK_SLEEP_TIME = 1;
     final static int DEFAULT_BUFFER_SIZE = 8192;
+    final static int DEFAULT_HEARTBEAT_TIMEOUT = 40;
+    final static int DEFAULT_PORT = 5000;
+    final static String DEFAULT_CONFIG_FILEPATH = "src/configuration";
+
+    private final static int DEFAULT_DRAFT_ELECTION_NUMBER = -1;
+
+    public RaftNode() throws IOException
+    {
+        this((byte) 0, DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_PORT, DEFAULT_CONFIG_FILEPATH);
+    }
 
     //TODO id never used
     public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath) throws IOException
@@ -77,9 +96,10 @@ public class RaftNode
         this.nodeTerm = 0;
         this.role = Role.FOLLOWER;
 
+        raftEntries = new LinkedBlockingQueue<>();
         receivedDrafts = new LinkedBlockingQueue<>();
         outgoingDrafts = new LinkedBlockingQueue<>();
-        pendingChanges = new LinkedBlockingQueue<>();
+        proposedDrafts = new LinkedBlockingQueue<>();
         log = new LinkedBlockingQueue<>();
 
         this.executorService = Executors.newCachedThreadPool();
@@ -87,14 +107,21 @@ public class RaftNode
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
 
 
+        this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath);
         streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts);
         //log server started
         this.id = this.identity.getId();
 
         this.leaderId = -1;
+        this.draftNumber = 0;
         this.knownTerm = 0;
         this.knownDraftNumber = 0;
+
+        //hardcoded for 2 nodes
+        this.votedFor = new int[]{-1, -1};
+
+        //logger.info("RaftNode was created, id: " + this.id);
     }
 
     public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
@@ -113,7 +140,7 @@ public class RaftNode
                 if(clock.electionTimeouted())
                 {
                     // TODO
-                    handleElectionTimeout();
+                    startNewElections();
                     clock.resetElectionTimeoutStartMoment();
                 }
 
@@ -175,11 +202,14 @@ public class RaftNode
                     }
                     else if(draft.isVoteForCandidate())
                     {
-                        //processVoteForCandidate(draft);
+                        processVoteForCandidate(draft);
                     }
                     else if(draft.isVoteRequest())
                     {
-                        //processVoteRequest(draft);
+                        if(draft.getKnownDraftNumber() == knownDraftNumber && draft.getKnownTerm() == nodeTerm + 1)
+                        {
+                            grantVote(draft.getLeaderID());
+                        }
                     }
                 }
             }
@@ -213,7 +243,6 @@ public class RaftNode
         {
             setRole(Role.FOLLOWER);
         }
-
     }
 
     void appendSet(int value, String key)
@@ -231,12 +260,13 @@ public class RaftNode
 //        //return new Draft(Draft.DraftType.HEARTBEAT, nodeTerm, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
 //    }
 
-    void handleElectionTimeout()
+    void startNewElections()
     {
         role = Role.CANDIDATE;
-        //Draft voteRequest = new Draft(Draft.DraftType.REQUEST_VOTE, getNodeTerm(), getId(), null);
-        //streamConnectionManager.sendToAll(voteRequest);
-        //outgoingDrafts.add(new Draft(Draft.DraftType.REQUEST_VOTE, nodeTerm))
+        startedElection = true;
+        leaderId = -1;
+        nodeTerm++;
+        streamConnectionManager.sendToAll(draftNewElection());
     }
 
     private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
@@ -263,7 +293,6 @@ public class RaftNode
         {
             identityArray[i] = clusterIdentities.get(i);
         }
-
         peers = identityArray;
     }
 
@@ -277,6 +306,8 @@ public class RaftNode
         {
             String[] line = inputStream.next().split(",");
             identities.add(new Identity(line[0], Integer.parseInt(line[1]), (byte) Integer.parseInt(line[2])));
+            nodesInCluster++;
+            votesReceived.put((byte) Integer.parseInt(line[2]), Boolean.FALSE);
         }
 
         inputStream.close();
@@ -363,8 +394,119 @@ public class RaftNode
         return role == Role.LEADER;
     }
 
-//    private Draft draftHeartbeat()
-//    {
-//        return new Draft(Draft.DraftType.HEARTBEAT, nodeTerm, leaderId, )
-//    }
+    private Draft draftLeaderHeartbeat()
+    {
+        RaftEntry[] entries = movePendingToProposed();
+        return new Draft(
+                Draft.DraftType.HEARTBEAT,
+                id,
+                leaderId,
+                nodeTerm,
+                draftNumber,
+                knownTerm,
+                knownDraftNumber,
+                entries
+        );
+    }
+
+    private RaftEntry[] movePendingToProposed()
+    {
+        RaftEntry[] output = new RaftEntry[raftEntries.size()];
+        int i = 0;
+        synchronized(proposedDrafts)
+        {
+            for(RaftEntry entry : raftEntries)
+            {
+                proposedDrafts.add(entry);
+                output[i] = entry;
+                i++;
+            }
+        }
+        raftEntries.clear();
+        return output;
+    }
+
+    private Draft draftNewElection()
+    {
+        draftNumber++;
+        return new Draft(
+                Draft.DraftType.REQUEST_VOTE,
+                id,
+                leaderId,
+                nodeTerm,
+                draftNumber,
+                knownTerm,
+                knownDraftNumber,
+                new RaftEntry[0]
+        );
+    }
+
+    private void grantVote(byte leaderId)
+    {
+        nodeTerm++;
+        votedFor[0] = nodeTerm;
+        votedFor[1] = leaderId;
+        streamConnectionManager.sendToId(draftGrantVote(leaderId), leaderId);
+    }
+
+    private Draft draftGrantVote(byte proposedLeaderId)
+    {
+        return new Draft(
+                Draft.DraftType.VOTE_FOR_CANDIDATE,
+                id,
+                proposedLeaderId,
+                nodeTerm,
+                DEFAULT_DRAFT_ELECTION_NUMBER,
+                knownTerm,
+                knownDraftNumber,
+                new RaftEntry[0]
+        );
+    }
+
+    private void processVoteForCandidate(Draft draft)
+    {
+        if(startedElection && draft.getTerm() == nodeTerm)
+        {
+            votesReceived.put(draft.getAuthorId(), true);
+        }
+        if(hasMajorityVotes())
+        {
+            acquireLeadership();
+        }
+    }
+
+    private void acquireLeadership()
+    {
+        role = Role.LEADER;
+        streamConnectionManager.sendToAll(draftEmptyHeartbeat());
+    }
+
+    private boolean hasMajorityVotes()
+    {
+        float positives = 0;
+        float count = 0;
+        for(Byte key : votesReceived.keySet())
+        {
+            if(votesReceived.get(key))
+            {
+                positives++;
+            }
+            count++;
+        }
+        return((positives / count) > 0.5);
+    }
+
+    private Draft draftEmptyHeartbeat()
+    {
+        return new Draft(
+                Draft.DraftType.HEARTBEAT,
+                id,
+                id,
+                nodeTerm,
+                draftNumber,
+                knownTerm,
+                knownDraftNumber,
+                new RaftEntry[0]
+        );
+    }
 }

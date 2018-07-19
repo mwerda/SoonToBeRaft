@@ -27,10 +27,13 @@ public class ClientStreamSession
         //this.selectionKey = selectionKey;
         this.channel = channel;
         this.channel.configureBlocking(false);
+
         this.receiveBuffer = ByteBuffer.allocateDirect(bufferSize);
         this.receiveBuffer.clear();
+
         this.sendBuffer = ByteBuffer.allocateDirect(bufferSize);
         this.sendBuffer.clear();
+
         this.receivedDrafts = receivedDrafts;
         this.outgoingDrafts = new LinkedBlockingQueue<>();
     }

@@ -10,17 +10,18 @@ import java.util.Arrays;
  *  ___________________________________________________________________________________________________________________________________________________________________
  * |                     CURRENT MESSAGE METADATA                                 |   PREVIOUS MESSAGE COMPLIANCE CHECK   |           STATE MACHINE PAYLOAD            |
  * |______________________________________________________________________________|_______________________________________|____________________________________________|
- * |  4 Bytes   |        1 Byte          |   4 Bytes   |  1 Byte   |   4 Bytes    |      4 Bytes     |       4 Bytes      |          4 Bytes         | variable length |
- * |------------|------------------------|-------------|-----------|--------------|------------------|--------------------|--------------------------|-----------------|
- * | Draft size | Draft type declaration | Term number | Leader ID | Draft number | Known Draft term | Known Draft number | No of RaftEntry elements | RaftEntry array |
+ * |  4 Bytes   |    1 Byte   |        1 Byte          |   4 Bytes   |  1 Byte   |   4 Bytes    |      4 Bytes     |       4 Bytes      |          4 Bytes         | variable length |
+ * |------------|-------------|------------------------|-------------|-----------|--------------|------------------|--------------------|--------------------------|-----------------|
+ * | Draft size | Author's ID | Draft type declaration | Term number | Leader ID | Draft number | Known Draft term | Known Draft number | No of RaftEntry elements | RaftEntry array |
  * |-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
  *
- * Overall 14 bytes at minimum. See RaftEntry javadoc for further explanation on how it is encapsulated in Draft.
+ * Overall 27 bytes at minimum. See RaftEntry javadoc for further explanation on how it is encapsulated in Draft.
  * 4 bytes describing Draft number are enough for 397 hours of communication with 1500 new Drafts emerging every second.
  */
 public class Draft
 {
     private static final int BYTES_PER_SIZE = Integer.SIZE / Byte.SIZE;
+    private static final int BYTES_PER_AUTHOR_ID = 1;
     private static final int BYTES_PER_MESSAGE_TYPE = 1;
     private static final int BYTES_PER_TERM = Integer.SIZE / Byte.SIZE;
     private static final int BYTES_PER_LEADER_ID = 1;
@@ -30,6 +31,7 @@ public class Draft
     private static final int BYTES_PER_ENTRIES_COUNT = Integer.SIZE / Byte.SIZE;
 
     private static final int POSITION_SIZE = 0;
+    private static final int POSITION_AUTHOR_ID = POSITION_SIZE + BYTES_PER_SIZE;
     private static final int POSITION_MESSAGE_TYPE = POSITION_SIZE + BYTES_PER_SIZE;
     private static final int POSITION_LEADER_ID = POSITION_MESSAGE_TYPE + BYTES_PER_MESSAGE_TYPE;
     private static final int POSITION_TERM = POSITION_LEADER_ID + BYTES_PER_LEADER_ID;
@@ -71,6 +73,7 @@ public class Draft
     }
 
     private int size;
+    private byte authorId;
     private DraftType draftType;
     private byte leaderID;
     private int term;
@@ -80,7 +83,7 @@ public class Draft
     private RaftEntry[] raftEntries;
     private int entriesCount;
 
-    public Draft(DraftType draftType, byte leaderID, int term, int draftNumber, int knownTerm, int knownDraftNumber, RaftEntry[] raftEntries)
+    public Draft(DraftType draftType, byte authorId, byte leaderID, int term, int draftNumber, int knownTerm, int knownDraftNumber, RaftEntry[] raftEntries)
     {
         int aggregatedEntriesSize = 0;
         for(RaftEntry entry : raftEntries)
@@ -89,6 +92,7 @@ public class Draft
         }
 
         this.size = BYTES_PER_SIZE
+                + BYTES_PER_AUTHOR_ID
                 + BYTES_PER_MESSAGE_TYPE
                 + BYTES_PER_TERM
                 + BYTES_PER_LEADER_ID
@@ -99,6 +103,7 @@ public class Draft
                 + aggregatedEntriesSize;
 
         this.draftType = draftType;
+        this.authorId = authorId;
         this.term = term;
         this.leaderID = leaderID;
         this.draftNumber = draftNumber;
@@ -111,7 +116,8 @@ public class Draft
     public static Draft fromByteArray(byte[] array)
     {
         DraftType draftType = DraftType.fromByte(array[POSITION_MESSAGE_TYPE]);
-        byte leaderID = array[POSITION_LEADER_ID];
+        byte authorId = array[POSITION_AUTHOR_ID];
+        byte leaderId = array[POSITION_LEADER_ID];
         int term = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_TERM, POSITION_TERM + BYTES_PER_TERM)).getInt();
         int draftNumber = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_DRAFT_NUMBER, POSITION_DRAFT_NUMBER + BYTES_PER_DRAFT_NUMBER)).getInt();
         int knownTerm = ByteBuffer.wrap(Arrays.copyOfRange(array, POSITION_KNOWN_TERM_NUMBER, POSITION_KNOWN_TERM_NUMBER + BYTES_PER_KNOWN_TERM_NUMBER)).getInt();
@@ -143,7 +149,7 @@ public class Draft
             decodedEntries[i] = new RaftEntry(operationType, value, key);
             currentPos = frameStartingPos + frameLength;
         }
-        return new Draft(draftType, leaderID, term, draftNumber, knownTerm, knownDraftNumber, decodedEntries);
+        return new Draft(draftType, authorId, leaderId, term, draftNumber, knownTerm, knownDraftNumber, decodedEntries);
     }
 
     public byte[] toByteArray()
@@ -213,5 +219,25 @@ public class Draft
     public boolean isVoteRequest()
     {
         return draftType == DraftType.REQUEST_VOTE;
+    }
+
+    public byte getAuthorId()
+    {
+        return authorId;
+    }
+
+    public int getKnownDraftNumber()
+    {
+        return knownDraftNumber;
+    }
+
+    public int getKnownTerm()
+    {
+        return knownTerm;
+    }
+
+    public byte getLeaderID()
+    {
+        return leaderID;
     }
 }

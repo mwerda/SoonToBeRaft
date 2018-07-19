@@ -2,21 +2,23 @@ package protocol; /**
  * Both min and max bounds are INCLUSIVE
  */
 
-import protocol.Draft;
-import protocol.RaftEntry;
 import java.util.Random;
 
 public class DraftRandomizer
 {
     private final static String CHARSET = "abcdefghijklmnopqrstuvwxyz";
 
+    private static int DEFAULT_AUTHOR_ID_MIN = 1;
+
+    private static int DEFAULT_AUTHOR_ID_MAX = 2;
+
     private static int DEFAULT_MIN_STRING_LENGTH = 2;
 
     private static int DEFAULT_MAX_STRING_LENGTH = 5;
 
-    private static byte DEFAULT_MIN_ID = 1;
+    private static byte DEFAULT_MIN_LEADER_ID = 1;
 
-    private static byte DEFAULT_MAX_ID = 100;
+    private static byte DEFAULT_MAX_LEADER_ID = 100;
 
     private static int DEFAULT_MIN_ENTRY_COUNT = 0;
 
@@ -32,7 +34,8 @@ public class DraftRandomizer
     {
         // 1 added as type numbering starts from 1 instead of 0
         Draft.DraftType draftType = Draft.DraftType.fromByte((byte) (random.nextInt(Draft.DraftType.values().length) + 1));
-        byte id = (byte) (random.nextInt(DEFAULT_MAX_ID + 1) + DEFAULT_MIN_ID);
+        byte authorId = (byte) (random.nextInt(DEFAULT_AUTHOR_ID_MAX + 1) + DEFAULT_AUTHOR_ID_MIN);
+        byte leaderId = (byte) (random.nextInt(DEFAULT_MAX_LEADER_ID + 1) + DEFAULT_MIN_LEADER_ID);
 
         // +1 not used for Integer max value overflow occurence
         int term = random.nextInt(DEFAULT_MAX_TERM_NUMBER) + DEFAULT_MIN_TERM_NUMBER;
@@ -55,7 +58,7 @@ public class DraftRandomizer
             raftEntries = new RaftEntry[0];
         }
 
-        return new Draft(draftType, id, term, draftNumber, knownTerm, knownDraftNumber, raftEntries);
+        return new Draft(draftType, authorId, leaderId, term, draftNumber, knownTerm, knownDraftNumber, raftEntries);
     }
 
     public static RaftEntry generateRaftEntry()
