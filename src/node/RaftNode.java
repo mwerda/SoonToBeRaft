@@ -114,7 +114,7 @@ public class RaftNode
         //log server started
         this.id = this.identity.getId();
 
-        logger.info("RaftNode was built, id: " + this.id);
+        logger.info("[SET-UP] RaftNode was built, id: " + this.id);
     }
 
     public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException

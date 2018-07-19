@@ -8,9 +8,7 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 
 // TODO Reconnets
@@ -20,10 +18,12 @@ public class StreamConnectionManager implements Runnable
     HashMap<Byte, Identity> idToIdentityMap;
     HashMap<Byte, ClientStreamSession> idToPeerSessionMap;
     HashMap<String, Identity> addressToIdentityMap;
+    ArrayList<Identity> identities;
     BlockingQueue<Draft> receivedDrafts;
     int port;
     int bufferSize;
-    int peersCount;
+    int peerCount;
+    boolean peersConnected;
 
     //TODO: think about unifying identities representation as map
     public StreamConnectionManager(Identity[] identities, int port, int bufferSize, BlockingQueue<Draft> receivedDrafts) throws IOException
@@ -31,6 +31,7 @@ public class StreamConnectionManager implements Runnable
         this.idToIdentityMap = new HashMap<>();
         this.idToPeerSessionMap = new HashMap<>();
         this.addressToIdentityMap = new HashMap<>();
+        this.identities = new ArrayList<Identity>(Arrays.asList(identities));
         for(Identity identity : identities)
         {
             // TODO Guava offers bidirectional maps
@@ -39,8 +40,9 @@ public class StreamConnectionManager implements Runnable
         }
         this.port = port;
         this.bufferSize = bufferSize;
-        this.peersCount = identities.length;
+        this.peerCount = identities.length;
         this.receivedDrafts = receivedDrafts;
+        this.peersConnected = false;
     }
 
 
@@ -70,6 +72,11 @@ public class StreamConnectionManager implements Runnable
         {
             try
             {
+                if(!peersConnected)
+                {
+                    establishConnectionWithPeers();
+                }
+
                 if(selector.select() != 0)
                 {
                     Set<SelectionKey> selectedKeys = selector.selectedKeys();
@@ -154,4 +161,22 @@ public class StreamConnectionManager implements Runnable
 //        }
     }
 
+    private void establishConnectionWithPeers() throws IOException
+    {
+        for(Identity identity : identities)
+        {
+            if(idToPeerSessionMap.get(identity.id) == null)
+            {
+                tryEstablishConnection(identity);
+            }
+        }
+    }
+
+    private void tryEstablishConnection(Identity identity) throws IOException
+    {
+        SocketChannel senderSocket = SocketChannel.open();
+        senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
+        ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
+        idToPeerSessionMap.put(identity.id, newPeerSession);
+    }
 }
