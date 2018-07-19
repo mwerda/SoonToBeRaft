@@ -62,6 +62,7 @@ public class StreamConnectionManager implements Runnable
                 e.printStackTrace();
             }
             logger.info("[SET-UP] ConnManager successfully connected with peers");
+            logger.info("[SET-UP] Closing active connector thread");
         });
 
         t.start();
