@@ -21,6 +21,9 @@ public class StreamConnectionManager implements Runnable
     HashMap<String, Identity> addressToIdentityMap;
     ArrayList<Identity> identities;
     BlockingQueue<Draft> receivedDrafts;
+    ServerSocketChannel serverSocket;
+    Selector selector;
+    SelectionKey serverSelectionKey;
     int port;
     int bufferSize;
     int peerCount;
@@ -49,6 +52,22 @@ public class StreamConnectionManager implements Runnable
         this.connectedPeerCount = 0;
         this.peersConnected = false;
 
+        serverSocket = null;
+        selector = null;
+        serverSelectionKey = null;
+        try
+        {
+            selector = Selector.open();
+            serverSocket = ServerSocketChannel.open();
+            serverSocket.bind(new InetSocketAddress(port));
+            serverSocket.configureBlocking(false);
+            serverSelectionKey = serverSocket.register(selector, SelectionKey.OP_ACCEPT);
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
         Thread t = new Thread(() ->
         {
             logger.info("[SET-UP] ConnManager started a new thread to connect with peers");
@@ -72,21 +91,21 @@ public class StreamConnectionManager implements Runnable
     public void run()
     {
         Thread.currentThread().setName("ConnectionManager");
-        ServerSocketChannel serverSocket = null;
-        Selector selector = null;
-        SelectionKey serverSelectionKey = null;
-        try
-        {
-            selector = Selector.open();
-            serverSocket = ServerSocketChannel.open();
-            serverSocket.bind(new InetSocketAddress(port));
-            serverSocket.configureBlocking(false);
-            serverSelectionKey = serverSocket.register(selector, SelectionKey.OP_ACCEPT);
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-        }
+//        ServerSocketChannel serverSocket = null;
+//        Selector selector = null;
+//        SelectionKey serverSelectionKey = null;
+//        try
+//        {
+//            selector = Selector.open();
+//            serverSocket = ServerSocketChannel.open();
+//            serverSocket.bind(new InetSocketAddress(port));
+//            serverSocket.configureBlocking(false);
+//            serverSelectionKey = serverSocket.register(selector, SelectionKey.OP_ACCEPT);
+//        }
+//        catch (IOException e)
+//        {
+//            e.printStackTrace();
+//        }
 
 
         ClientStreamSession session = null;
@@ -202,8 +221,10 @@ public class StreamConnectionManager implements Runnable
                 senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
                 logger.info("[N] Established connection with " + identity.ipAddress);
                 ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
+                senderSocket.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, newPeerSession);
                 idToPeerSessionMap.put(identity.id, newPeerSession);
                 connected = true;
+                connectedPeerCount += 1;
             }
             catch(ConnectException | ClosedChannelException ce)
             {
