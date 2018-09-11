@@ -53,7 +53,6 @@ class ClientStreamSessionTest
             }
         };
 
-        // sanity breakpoint
         receiverThread.start();
         int receiverQueueSize = receiverSession.receivedDrafts.size();
         long eventTime = System.nanoTime();
