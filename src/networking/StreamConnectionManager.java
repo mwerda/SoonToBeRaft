@@ -164,16 +164,6 @@ public class StreamConnectionManager implements Runnable
             {
                 e.printStackTrace();
             }
-//            try
-//            {
-//                ClientStreamSession newPeerSession = new ClientStreamSession(serverSocket.accept(), 2048);
-//
-//                peerSessions.add(newPeerSession);
-//            }
-//            catch (IOException e)
-//            {
-//                e.printStackTrace();
-//            }
         }
     }
 
