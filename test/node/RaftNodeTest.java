@@ -12,7 +12,7 @@ class RaftNodeTest
     void testElectionTimeout() throws IOException, InterruptedException
     {
         RaftNode node = new RaftNode();
-        node.runNode();
+        node.runNode(RaftNode.Mode.LISTENER);
         Thread.sleep(100000);
     }
 }

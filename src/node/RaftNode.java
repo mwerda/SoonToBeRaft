@@ -37,6 +37,15 @@ public class RaftNode
         LEADER
     }
 
+    /**
+     * Listener - disabled clock, never timeouts
+     */
+    enum Mode
+    {
+        FULL_NODE,
+        LISTENER
+    }
+
     final Logger logger = Logger.getLogger(RaftNode.class);
 
     public final static long[] ELECTION_TIMEOUT_BOUNDS = {8000, 12000};//{150, 300};
@@ -121,18 +130,23 @@ public class RaftNode
 
     public void runNode()
     {
+        runNode(Mode.FULL_NODE);
+    }
+
+    public void runNode(Mode mode)
+    {
         logger.info("Running node");
 
         executorService.execute(() ->
         {
-            logger.info("[T] Receiver thread started");
+            logger.info("[Thread] Receiver thread started");
             Thread.currentThread().setName("Receiver");
             runStreamConnectionManager();
         });
 
         executorService.execute(() ->
         {
-            logger.info("[T] Consumer thread started");
+            logger.info("[Thread] Consumer thread started");
             Thread.currentThread().setName("Consumer");
             while(true)
             {
@@ -177,36 +191,42 @@ public class RaftNode
             }
         });
 
-        executorService.execute(() ->
+        if(mode != Mode.LISTENER)
         {
-            logger.info("[T] Clock thread started");
-            Thread.currentThread().setName("Clock");
-            while(true)
+            executorService.execute(() ->
             {
-                if(clock.electionTimeouted())
+                logger.info("[Thread] Clock thread started");
+                Thread.currentThread().setName("Clock");
+                while(true)
                 {
-                    logger.info("Election timeout reached: starting new election");
-                    startNewElections();
-                    clock.resetElectionTimeoutStartMoment();
-                }
+                    if(clock.electionTimeouted())
+                    {
+                        logger.info("Election timeout reached: starting new election");
+                        startNewElections();
+                        clock.resetElectionTimeoutStartMoment();
+                    }
 
-                if(role == Role.LEADER && clock.heartbeatTimeouted())
-                {
-                    // TODO
-                    // handleHeartbeatTimeout()
-                    clock.resetHeartbeatTimeoutStartMoment();
-                }
+                    if(role == Role.LEADER && clock.heartbeatTimeouted())
+                    {
+                        // TODO
+                        // handleHeartbeatTimeout()
+                        clock.resetHeartbeatTimeoutStartMoment();
+                    }
 
-                try
-                {
-                    Thread.sleep(CLOCK_SLEEP_TIME);
+                    try
+                    {
+                        Thread.sleep(CLOCK_SLEEP_TIME);
+                    }
+                    catch (InterruptedException e)
+                    {
+                        e.printStackTrace();
+                    }
                 }
-                catch (InterruptedException e)
-                {
-                    e.printStackTrace();
-                }
-            }
-        });
+            });
+        }
+        else
+            logger.info("[Thread] Clock suspended from running, Node in LISTENER mode");
+
 
 
 //        executorService.execute(() ->
@@ -229,118 +249,6 @@ public class RaftNode
             runStreamConnectionManager();
         });
 
-    }
-
-    private void processHeartbeat(Draft draft)
-    {
-        if(!isFollower())
-        {
-            setRole(Role.FOLLOWER);
-        }
-    }
-
-    void appendSet(int value, String key)
-    {
-        raftEntries.add(new RaftEntry(RaftEntry.OperationType.SET, value, key));
-    }
-
-    void appendRemove(String key)
-    {
-        raftEntries.add(new RaftEntry(RaftEntry.OperationType.REMOVE, 0, key));
-    }
-
-//    Draft prepareHeartbeatDraft()
-//    {
-//        //return new Draft(Draft.DraftType.HEARTBEAT, nodeTerm, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
-//    }
-
-    void startNewElections()
-    {
-        role = Role.CANDIDATE;
-        logger.info("Node switched to CANDIDATE state");
-
-        startedElection = true;
-        knownLeaderId = -1;
-        nodeTerm++;
-        streamConnectionManager.sendToAll(draftNewElection());
-        logger.info("Sent to all: new election request");
-    }
-
-    private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
-    {
-        logger.info("[SET-UP] Reading config file");
-        LinkedList<String> interfacesAddresses = getIpAddresses();
-        LinkedList<Identity> clusterIdentities = getClusterIdentities(configFilePath);
-
-        for(Identity identity : clusterIdentities)
-        {
-            for(String address : interfacesAddresses)
-            {
-                if(address != null && identity != null && address.equals(identity.getIpAddress()))
-                {
-                    this.identity = new Identity(identity);
-                    clusterIdentities.remove(identity);
-                    break;
-                }
-            }
-        }
-
-        //TODO make a function to cast linked list to array, class as arg
-        Identity[] identityArray = new Identity[clusterIdentities.size()];
-        for(int i = 0; i < clusterIdentities.size(); i++)
-        {
-            identityArray[i] = clusterIdentities.get(i);
-        }
-        peers = identityArray;
-        logger.info("[SET-UP] Built identity array");
-    }
-
-    private LinkedList<Identity> getClusterIdentities(String configFilePath) throws FileNotFoundException
-    {
-        LinkedList<Identity> identities = new LinkedList<>();
-
-        File configFile = new File(configFilePath);
-        Scanner inputStream = new Scanner(configFile);
-        while(inputStream.hasNext())
-        {
-            String[] line = inputStream.next().split(",");
-            identities.add(new Identity(line[0], Integer.parseInt(line[1]), (byte) Integer.parseInt(line[2])));
-            nodesInCluster++;
-            votesReceived.put((byte) Integer.parseInt(line[2]), Boolean.FALSE);
-        }
-
-        inputStream.close();
-        return identities;
-    }
-
-    private static LinkedList<String> getIpAddresses()
-    {
-        String ip;
-        LinkedList<String> addressesList = new LinkedList<>();
-        try
-        {
-            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-            while (interfaces.hasMoreElements())
-            {
-                NetworkInterface iface = interfaces.nextElement();
-                // filters out 127.0.0.1 and inactive interfaces
-                if(iface.isLoopback() || !iface.isUp())
-                    continue;
-
-                Enumeration<InetAddress> addresses = iface.getInetAddresses();
-                while(addresses.hasMoreElements())
-                {
-                    InetAddress addr = addresses.nextElement();
-                    ip = addr.getHostAddress();
-                    addressesList.add(ip);
-                }
-            }
-        }
-        catch (SocketException e)
-        {
-            throw new RuntimeException(e);
-        }
-        return addressesList;
     }
 
     public void runStreamConnectionManager()
@@ -391,6 +299,126 @@ public class RaftNode
     public boolean isLeader()
     {
         return role == Role.LEADER;
+    }
+
+    void appendSet(int value, String key)
+    {
+        raftEntries.add(new RaftEntry(RaftEntry.OperationType.SET, value, key));
+    }
+
+    void appendRemove(String key)
+    {
+        raftEntries.add(new RaftEntry(RaftEntry.OperationType.REMOVE, 0, key));
+    }
+
+//    Draft prepareHeartbeatDraft()
+//    {
+//        //return new Draft(Draft.DraftType.HEARTBEAT, nodeTerm, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
+//    }
+
+    void startNewElections()
+    {
+        role = Role.CANDIDATE;
+        logger.info("Node switched to CANDIDATE state");
+
+        startedElection = true;
+        knownLeaderId = -1;
+        nodeTerm++;
+        streamConnectionManager.sendToAll(draftNewElection());
+        logger.info("Sent to all: new election request");
+    }
+
+    private void processHeartbeat(Draft draft)
+    {
+        if(!isFollower())
+        {
+            setRole(Role.FOLLOWER);
+        }
+    }
+
+    /**
+     * Builds identity array put of config file
+     */
+    private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
+    {
+        logger.info("[SET-UP] Reading config file");
+        LinkedList<String> myNetworkAddresses = getMyNetworkAddresses();
+        LinkedList<Identity> clusterIdentities = getClusterIdentities(configFilePath);
+        setOwnIdentity(myNetworkAddresses, clusterIdentities);
+
+
+        //TODO make a function to cast linked list to array, class as arg
+        Identity[] identityArray = new Identity[clusterIdentities.size()];
+        for(int i = 0; i < clusterIdentities.size(); i++)
+        {
+            identityArray[i] = clusterIdentities.get(i);
+        }
+        peers = identityArray;
+        logger.info("[SET-UP] Built identity array");
+    }
+
+    private void setOwnIdentity(LinkedList<String> myNetworkAddresses, LinkedList<Identity> clusterIdentities)
+    {
+        for(Identity identity : clusterIdentities)
+        {
+            for(String address : myNetworkAddresses)
+            {
+                if(address != null && identity != null && address.equals(identity.getIpAddress()))
+                {
+                    this.identity = new Identity(identity);
+                    clusterIdentities.remove(identity);
+                    break;
+                }
+            }
+        }
+    }
+
+    private LinkedList<Identity> getClusterIdentities(String configFilePath) throws FileNotFoundException
+    {
+        LinkedList<Identity> identities = new LinkedList<>();
+
+        File configFile = new File(configFilePath);
+        Scanner inputStream = new Scanner(configFile);
+        while(inputStream.hasNext())
+        {
+            String[] line = inputStream.next().split(",");
+            identities.add(new Identity(line[0], Integer.parseInt(line[1]), (byte) Integer.parseInt(line[2])));
+            nodesInCluster++;
+            votesReceived.put((byte) Integer.parseInt(line[2]), Boolean.FALSE);
+        }
+
+        inputStream.close();
+        return identities;
+    }
+
+    private static LinkedList<String> getMyNetworkAddresses()
+    {
+        String ip;
+        LinkedList<String> addressesList = new LinkedList<>();
+        try
+        {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements())
+            {
+                NetworkInterface iface = interfaces.nextElement();
+                // filters out 127.0.0.1 and inactive interfaces
+                if(iface.isLoopback() || !iface.isUp())
+                    continue;
+
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while(addresses.hasMoreElements())
+                {
+                    InetAddress addr = addresses.nextElement();
+                    ip = addr.getHostAddress();
+                    addressesList.add(ip);
+                }
+            }
+        }
+        catch (SocketException e)
+        {
+            throw new RuntimeException(e);
+        }
+        return addressesList;
     }
 
     private Draft draftLeaderHeartbeat()
