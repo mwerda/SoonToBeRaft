@@ -1,4 +1,4 @@
-package protocol; /**
+package wenatchee.protocol; /**
  * Both min and max bounds are INCLUSIVE
  */
 

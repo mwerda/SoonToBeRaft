@@ -1,8 +1,4 @@
-package networking;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.channels.ServerSocketChannel;
+package wenatchee.networking;
 
 public class StreamNetwork
 {

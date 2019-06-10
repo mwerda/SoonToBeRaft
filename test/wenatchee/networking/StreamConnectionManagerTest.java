@@ -1,16 +1,10 @@
-package networking;
+package wenatchee.networking;
 
-import jdk.nashorn.internal.ir.Block;
-import node.RaftNode;
+import wenatchee.node.RaftNode;
 import org.junit.jupiter.api.Test;
-import protocol.Draft;
-import sun.security.provider.NativePRNG;
 
 import java.io.IOException;
 import java.util.Scanner;
-import java.util.concurrent.BlockingQueue;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class StreamConnectionManagerTest
 {
@@ -24,7 +18,7 @@ class StreamConnectionManagerTest
         // 1375.541 kB per s
         // 100% delivered
 
-        RaftNode node = new RaftNode((byte) 1, 30, 5000, "src/configuration", 100000);
+        RaftNode node = new RaftNode(30, 5000, "src/configuration", 100000);
         node.runNode();
         Scanner s = new Scanner(System.in);
         String cmd = s.nextLine();

@@ -1,6 +1,6 @@
-package networking;
+package wenatchee.networking;
 
-import protocol.Draft;
+import wenatchee.protocol.Draft;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -198,6 +198,7 @@ public class StreamConnectionManager implements Runnable
                 tryEstablishConnection(identity);
             }
         }
+
     }
 
     private void tryEstablishConnection(Identity identity) throws IOException, InterruptedException

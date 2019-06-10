@@ -1,4 +1,4 @@
-package networking;
+package wenatchee.networking;
 
 public class Identity
 {

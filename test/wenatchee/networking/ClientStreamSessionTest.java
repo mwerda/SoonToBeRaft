@@ -1,11 +1,11 @@
 /**
  * Attention required! This test will NOT finish properly unattended. It requires two separate machines.
  */
-package networking;
+package wenatchee.networking;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import protocol.Draft;
+import wenatchee.protocol.Draft;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

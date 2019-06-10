@@ -1,4 +1,4 @@
-package protocol;
+package wenatchee.protocol;
 /**
  * RaftEntry contains a trace of a single change made on replicated state machine.
  * Each RaftEntry is built as follows:

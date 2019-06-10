@@ -1,4 +1,4 @@
-package node;
+package wenatchee.node;
 
 import java.util.Random;
 import java.util.concurrent.TimeUnit;

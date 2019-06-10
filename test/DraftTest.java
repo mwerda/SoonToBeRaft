@@ -1,5 +1,5 @@
-import protocol.Draft;
-import protocol.RaftEntry;
+import wenatchee.protocol.Draft;
+import wenatchee.protocol.RaftEntry;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

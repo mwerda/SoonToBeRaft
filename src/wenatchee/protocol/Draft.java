@@ -1,4 +1,4 @@
-package protocol;
+package wenatchee.protocol;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;

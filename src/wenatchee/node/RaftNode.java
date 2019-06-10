@@ -1,4 +1,4 @@
-package node; /**
+package wenatchee.node; /**
  * RaftNode represents a single node in cluster. It orchestrates four distinct threads:
  * 1. Clock, responsible for signalling timeouts on election and heartbeat and measuring elapsed time
  * It checks for timeouts every CLOCK_SLEEP_TIME, by default 1 ms
@@ -13,10 +13,11 @@ package node; /**
 //TODO remove id from constructor
 //TODO buffer underflow exception happens randomly - compaction problem?
 
-import networking.Identity;
-import networking.StreamConnectionManager;
-import protocol.Draft;
-import protocol.RaftEntry;
+import wenatchee.exceptions.IdentityUnknownException;
+import wenatchee.networking.Identity;
+import wenatchee.networking.StreamConnectionManager;
+import wenatchee.protocol.Draft;
+import wenatchee.protocol.RaftEntry;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -88,10 +89,10 @@ public class RaftNode
 
     public RaftNode() throws IOException
     {
-        this((byte) 0, DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_PORT, DEFAULT_CONFIG_FILEPATH);
+        this(DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_PORT, DEFAULT_CONFIG_FILEPATH);
     }
 
-    public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath) throws IOException
+    public RaftNode(int heartbeatTimeout, int port, String configFilePath) throws IOException
     {
         logger.info("[SET-UP] Node set-up has begun");
 
@@ -122,9 +123,9 @@ public class RaftNode
         logger.info("[SET-UP] RaftNode was built, id: " + this.id);
     }
 
-    public RaftNode(byte id, int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
+    public RaftNode(int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
     {
-        this(id, heartbeatTimeout, port, configFilePath);
+        this(heartbeatTimeout, port, configFilePath);
         metaCollector = new MetaCollector(testSize);
     }
 
@@ -170,7 +171,6 @@ public class RaftNode
                             setNodeTerm(draft.getTerm());
                         }
                     }
-
 
                     if(draft.isHeartbeat())
                     {
@@ -337,7 +337,7 @@ public class RaftNode
     }
 
     /**
-     * Builds identity array put of config file
+     * Builds identity array out of config file
      */
     private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
     {
@@ -345,7 +345,6 @@ public class RaftNode
         LinkedList<String> myNetworkAddresses = getMyNetworkAddresses();
         LinkedList<Identity> clusterIdentities = getClusterIdentities(configFilePath);
         setOwnIdentity(myNetworkAddresses, clusterIdentities);
-
 
         //TODO make a function to cast linked list to array, class as arg
         Identity[] identityArray = new Identity[clusterIdentities.size()];
@@ -357,8 +356,12 @@ public class RaftNode
         logger.info("[SET-UP] Built identity array");
     }
 
-    private void setOwnIdentity(LinkedList<String> myNetworkAddresses, LinkedList<Identity> clusterIdentities)
+    private void setOwnIdentity(
+            LinkedList<String> myNetworkAddresses,
+            LinkedList<Identity> clusterIdentities
+    ) throws IdentityUnknownException
     {
+        boolean ownIdentitySet = false;
         for(Identity identity : clusterIdentities)
         {
             for(String address : myNetworkAddresses)
@@ -367,9 +370,18 @@ public class RaftNode
                 {
                     this.identity = new Identity(identity);
                     clusterIdentities.remove(identity);
+                    ownIdentitySet = true;
+                    // micro-opt
                     break;
                 }
             }
+        }
+
+        if(!ownIdentitySet)
+        {
+            throw new IdentityUnknownException(
+                    "FATAL: setOwnIdentity failed; own identity not found on list of known identities"
+            );
         }
     }
 
