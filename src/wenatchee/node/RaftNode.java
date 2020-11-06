@@ -104,9 +104,10 @@ public class RaftNode
 
     public RaftNode(int heartbeatTimeout, int port, String configFilePath, int configId) throws IOException
     {
+        this.id = (byte)configId;
         this.logger = Logger.getLogger(RaftNode.class.getName());
 
-        this.logger.info("[SET-UP] Node set-up has begun");
+        this.logger.info(this.id + ": [SET-UP] Node set-up has begun");
 
         this.heartbeatTimeout = heartbeatTimeout;
         this.nodeTerm = 0;
@@ -129,10 +130,15 @@ public class RaftNode
 
         this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath, configId);
-        streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts, this.logger);
+        streamConnectionManager = new StreamConnectionManager(
+                this.peers, this.identity, port, DEFAULT_BUFFER_SIZE, receivedDrafts, this.logger
+        );
+
+        //streamConnectionManager.getInfo();
+
         this.id = this.identity.getId();
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
-        this.logger.info("[SET-UP] RaftNode was built, id: " + this.id);
+        this.logger.info(this.id + ": [SET-UP] RaftNode was built, id: " + this.id);
     }
 
 //    public RaftNode(int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
@@ -148,18 +154,18 @@ public class RaftNode
 
     public void runNode(Mode mode)
     {
-        this.logger.info("Running node");
+        this.logger.info(this.id + ": Running node");
 
         executorService.execute(() ->
         {
-            this.logger.info("[Thread] Receiver thread started");
+            this.logger.info(this.id + ": [Thread] Receiver thread started");
             Thread.currentThread().setName("Receiver");
             runStreamConnectionManager();
         });
 
         executorService.execute(() ->
         {
-            logger.info("[Thread] Consumer thread started");
+            logger.info(this.id + ": [Thread] Consumer thread started");
             Thread.currentThread().setName("Consumer");
             while(true)
             {
@@ -207,13 +213,13 @@ public class RaftNode
         {
             executorService.execute(() ->
             {
-                logger.info("[Thread] Clock thread started");
+                logger.info(this.id + ": [Thread] Clock thread started");
                 Thread.currentThread().setName("Clock");
                 while(true)
                 {
                     if(clock.electionTimeouted())
                     {
-                        logger.info("Election timeout reached: starting new election");
+                        logger.info(this.id + ": Election timeout reached: starting new election");
                         startNewElections();
                         clock.resetElectionTimeoutStartMoment();
                     }
@@ -237,7 +243,7 @@ public class RaftNode
             });
         }
         else
-            logger.info("[Thread] Clock suspended from running, Node in LISTENER mode");
+            logger.info(this.id + ": [Thread] Clock suspended from running, Node in LISTENER mode");
 
 
 
@@ -331,13 +337,13 @@ public class RaftNode
     void startNewElections()
     {
         role = Role.CANDIDATE;
-        this.logger.info("Node switched to CANDIDATE state");
+        this.logger.info(this.id + ": Node switched to CANDIDATE state");
 
         startedElection = true;
         knownLeaderId = -1;
         nodeTerm++;
         streamConnectionManager.sendToAll(draftNewElection());
-        this.logger.info("Sent to all: new election request");
+        this.logger.info(this.id + ": Sent to all: new election request");
     }
 
     private void processHeartbeat(Draft draft)
@@ -353,20 +359,29 @@ public class RaftNode
      */
     private void discoverClusterIdentities(String configFilePath, int configId) throws FileNotFoundException
     {
-        this.logger.info("[SET-UP] Reading config file");
+        this.logger.info(this.id + ": [SET-UP] Reading config file");
         LinkedList<String> myNetworkAddresses = getMyNetworkAddresses();
         LinkedList<Identity> clusterIdentities = getClusterIdentities(configFilePath);
         Identity ownIdentity = clusterIdentities.get(configId);
         setOwnIdentity(myNetworkAddresses, ownIdentity);
 
         //TODO make a function to cast linked list to array, class as arg
-        Identity[] identityArray = new Identity[clusterIdentities.size()];
+        Identity[] identityArray = new Identity[clusterIdentities.size() - 1];
+        int minus = 0;
         for(int i = 0; i < clusterIdentities.size(); i++)
         {
-            identityArray[i] = clusterIdentities.get(i);
+            int k = i - minus;
+            if(!(ownIdentity.getIpAddress().equals(clusterIdentities.get(i).getIpAddress())))
+            {
+                identityArray[k] = clusterIdentities.get(i);
+            }
+            else
+            {
+                minus += 1;
+            }
         }
-        peers = identityArray;
-        this.logger.info("[SET-UP] Built identity array");
+        this.peers = identityArray;
+        this.logger.info(this.id + ": [SET-UP] Built identity array");
     }
 
     private void setOwnIdentity(
@@ -516,12 +531,12 @@ public class RaftNode
     {
         if(startedElection && draft.getTerm() == nodeTerm)
         {
-            this.logger.info("Received a vote for term " + draft.getTerm() + " from node of id: " + draft.getAuthorId());
+            this.logger.info(this.id + ": Received a vote for term " + draft.getTerm() + " from node of id: " + draft.getAuthorId());
             votesReceived.put(draft.getAuthorId(), true);
         }
         if(hasMajorityVotes())
         {
-            this.logger.info("Got majority of votes - acquiring leadership");
+            this.logger.info(this.id + ": Got majority of votes - acquiring leadership");
             acquireLeadership();
         }
     }
@@ -529,9 +544,9 @@ public class RaftNode
     private void acquireLeadership()
     {
         role = Role.LEADER;
-        this.logger.info("Role switched to LEADER");
+        this.logger.info(this.id + ": Role switched to LEADER");
         streamConnectionManager.sendToAll(draftEmptyHeartbeat());
-        this.logger.info("Sent first heartbeat after acquiring leadership.");
+        this.logger.info(this.id + ": Sent first heartbeat after acquiring leadership.");
     }
 
     private boolean hasMajorityVotes()

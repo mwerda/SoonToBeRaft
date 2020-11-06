@@ -5,6 +5,7 @@ import wenatchee.protocol.Draft;
 
 import java.io.IOException;
 import java.net.ConnectException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.*;
 import java.util.*;
@@ -18,7 +19,7 @@ public class StreamConnectionManager implements Runnable
     HashMap<Byte, Identity> idToIdentityMap;
     HashMap<Byte, ClientStreamSession> idToPeerSessionMap;
     HashMap<String, Identity> addressToIdentityMap;
-    ArrayList<Identity> identities;
+    ArrayList<Identity> remoteIdentities;
     BlockingQueue<Draft> receivedDrafts;
     ServerSocketChannel serverSocket;
     Selector selector;
@@ -29,16 +30,26 @@ public class StreamConnectionManager implements Runnable
     int connectedPeerCount;
     boolean peersConnected;
     Logger logger;
+    Identity ownIdentity;
 
-    //TODO: think about unifying identities representation as map
-    public StreamConnectionManager(Identity[] identities, int port, int bufferSize, BlockingQueue<Draft> receivedDrafts, Logger logger) throws IOException
+    public void getInfo()
     {
+        return;
+    }
+
+    //TODO: think about unifying remoteIdentities representation as map
+    public StreamConnectionManager(
+            Identity[] remoteIdentities, Identity ownIdentity, int port, int bufferSize,
+            BlockingQueue<Draft> receivedDrafts, Logger logger
+    ) throws IOException
+    {
+        this.ownIdentity = ownIdentity;
         this.logger = logger;
         this.idToIdentityMap = new HashMap<>();
         this.idToPeerSessionMap = new HashMap<>();
         this.addressToIdentityMap = new HashMap<>();
-        this.identities = new ArrayList<Identity>(Arrays.asList(identities));
-        for(Identity identity : identities)
+        this.remoteIdentities = new ArrayList<Identity>(Arrays.asList(remoteIdentities));
+        for(Identity identity : remoteIdentities)
         {
             // TODO Guava offers bidirectional maps
             idToIdentityMap.put(identity.id, identity);
@@ -46,7 +57,7 @@ public class StreamConnectionManager implements Runnable
         }
         this.port = port;
         this.bufferSize = bufferSize;
-        this.peerCount = identities.length;
+        this.peerCount = remoteIdentities.length;
         this.receivedDrafts = receivedDrafts;
         // TODO multithreading race condition
         this.connectedPeerCount = 0;
@@ -59,7 +70,7 @@ public class StreamConnectionManager implements Runnable
         {
             selector = Selector.open();
             serverSocket = ServerSocketChannel.open();
-            serverSocket.bind(new InetSocketAddress(port));
+            serverSocket.bind(new InetSocketAddress(this.ownIdentity.getIpAddress(), port));
             serverSocket.configureBlocking(false);
             serverSelectionKey = serverSocket.register(selector, SelectionKey.OP_ACCEPT);
         }
@@ -70,7 +81,7 @@ public class StreamConnectionManager implements Runnable
 
         Thread t = new Thread(() ->
         {
-            this.logger.info("[SET-UP] ConnManager started a new thread to connect with peers");
+            this.logger.info(this.ownIdentity.getIpAddress() + ": [SET-UP] ConnManager started a new thread to connect with peers");
             try
             {
                 establishConnectionWithPeers();
@@ -80,8 +91,8 @@ public class StreamConnectionManager implements Runnable
             {
                 e.printStackTrace();
             }
-            this.logger.info("[SET-UP] ConnManager successfully connected with peers");
-            this.logger.info("[SET-UP] Closing active connector thread");
+            this.logger.info(this.ownIdentity.getIpAddress() + ": [SET-UP] ConnManager successfully connected with peers");
+            this.logger.info(this.ownIdentity.getIpAddress() + ": [SET-UP] Closing connector, since connections are created");
         });
 
         t.start();
@@ -107,8 +118,9 @@ public class StreamConnectionManager implements Runnable
 //            e.printStackTrace();
 //        }
 
-
+        //In response to
         ClientStreamSession session = null;
+        int ctr = 0;
         while(true)
         {
             try
@@ -125,14 +137,15 @@ public class StreamConnectionManager implements Runnable
                             if(key.isAcceptable())
                             {
                                 //TODO serversocket responds before accept?
+                                //here socketchannel is created
                                 SocketChannel client = serverSocket.accept();
                                 client.configureBlocking(false);
 
                                 // If for given ID connection was created before, new connection invalidates the older;
                                 // Thus, channel is closed and replaced
                                 String remoteAddress = ((InetSocketAddress) client.getRemoteAddress()).getAddress().toString().replace("/", "");
-                                this.logger.info("[N] Incoming connection from " + remoteAddress);
-                                byte id = addressToIdentityMap.get(remoteAddress).id;
+                                this.logger.info(this.ownIdentity.getIpAddress() + ": [N] Incoming connection from " + remoteAddress);
+                                byte id = this.addressToIdentityMap.get(remoteAddress).id;
                                 ClientStreamSession newPeerSession = new ClientStreamSession(client, bufferSize, receivedDrafts);
                                 if(idToPeerSessionMap.get(id) != null)
                                 {
@@ -190,7 +203,7 @@ public class StreamConnectionManager implements Runnable
 
     private void establishConnectionWithPeers() throws IOException, InterruptedException
     {
-        for(Identity identity : identities)
+        for(Identity identity : this.remoteIdentities)
         {
             //TODO idToPeerSessionMap race condition may apply
             if(idToPeerSessionMap.get(identity.id) == null)
@@ -201,6 +214,8 @@ public class StreamConnectionManager implements Runnable
 
     }
 
+
+    // Albo nie Powazny blad, socketchannel jest otwierany na wejsciu do serversocketchannel
     private void tryEstablishConnection(Identity identity) throws IOException, InterruptedException
     {
         SocketChannel senderSocket = SocketChannel.open();
@@ -210,7 +225,7 @@ public class StreamConnectionManager implements Runnable
             try
             {
                 senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
-                this.logger.info("[N] Connected to " + identity.ipAddress);
+                this.logger.info(this.ownIdentity.getIpAddress() + ": [N] Connected to " + identity.ipAddress);
                 ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
                 senderSocket.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, newPeerSession);
                 idToPeerSessionMap.put(identity.id, newPeerSession);
