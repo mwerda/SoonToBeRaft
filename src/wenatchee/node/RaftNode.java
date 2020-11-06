@@ -27,7 +27,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.*;
 import java.util.concurrent.*;
-import org.apache.log4j.Logger;
+import java.util.logging.Logger;
 
 public class RaftNode
 {
@@ -47,7 +47,7 @@ public class RaftNode
         LISTENER
     }
 
-    final Logger logger = Logger.getLogger(RaftNode.class);
+    Logger logger;
 
     public final static long[] ELECTION_TIMEOUT_BOUNDS = {8000, 12000};//{150, 300};
     public final static int HEARTBEAT_TIMEOUT = 40;
@@ -57,6 +57,7 @@ public class RaftNode
     final static int DEFAULT_PORT = 5000;
     final static String DEFAULT_CONFIG_FILEPATH = "src/configuration";
     private final static int DEFAULT_DRAFT_ELECTION_NUMBER = -1;
+
 
     byte id;
     int heartbeatTimeout;
@@ -92,9 +93,20 @@ public class RaftNode
         this(DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_PORT, DEFAULT_CONFIG_FILEPATH);
     }
 
+    public void logInfo(String msg)
+    {
+        this.logger.info(msg);
+    }
+    public void logSevere(String msg)
+    {
+        this.logger.severe(msg);
+    }
+
     public RaftNode(int heartbeatTimeout, int port, String configFilePath) throws IOException
     {
-        logger.info("[SET-UP] Node set-up has begun");
+        this.logger = Logger.getLogger(RaftNode.class.getName());
+
+        this.logger.info("[SET-UP] Node set-up has begun");
 
         this.heartbeatTimeout = heartbeatTimeout;
         this.nodeTerm = 0;
@@ -117,10 +129,10 @@ public class RaftNode
 
         this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath);
-        streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts);
+        streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts, this.logger);
         this.id = this.identity.getId();
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
-        logger.info("[SET-UP] RaftNode was built, id: " + this.id);
+        this.logger.info("[SET-UP] RaftNode was built, id: " + this.id);
     }
 
     public RaftNode(int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
@@ -136,11 +148,11 @@ public class RaftNode
 
     public void runNode(Mode mode)
     {
-        logger.info("Running node");
+        this.logger.info("Running node");
 
         executorService.execute(() ->
         {
-            logger.info("[Thread] Receiver thread started");
+            this.logger.info("[Thread] Receiver thread started");
             Thread.currentThread().setName("Receiver");
             runStreamConnectionManager();
         });
@@ -319,13 +331,13 @@ public class RaftNode
     void startNewElections()
     {
         role = Role.CANDIDATE;
-        logger.info("Node switched to CANDIDATE state");
+        this.logger.info("Node switched to CANDIDATE state");
 
         startedElection = true;
         knownLeaderId = -1;
         nodeTerm++;
         streamConnectionManager.sendToAll(draftNewElection());
-        logger.info("Sent to all: new election request");
+        this.logger.info("Sent to all: new election request");
     }
 
     private void processHeartbeat(Draft draft)
@@ -341,7 +353,7 @@ public class RaftNode
      */
     private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
     {
-        logger.info("[SET-UP] Reading config file");
+        this.logger.info("[SET-UP] Reading config file");
         LinkedList<String> myNetworkAddresses = getMyNetworkAddresses();
         LinkedList<Identity> clusterIdentities = getClusterIdentities(configFilePath);
         setOwnIdentity(myNetworkAddresses, clusterIdentities);
@@ -353,7 +365,7 @@ public class RaftNode
             identityArray[i] = clusterIdentities.get(i);
         }
         peers = identityArray;
-        logger.info("[SET-UP] Built identity array");
+        this.logger.info("[SET-UP] Built identity array");
     }
 
     private void setOwnIdentity(
@@ -506,12 +518,12 @@ public class RaftNode
     {
         if(startedElection && draft.getTerm() == nodeTerm)
         {
-            logger.info("Received a vote for term " + draft.getTerm() + " from node of id: " + draft.getAuthorId());
+            this.logger.info("Received a vote for term " + draft.getTerm() + " from node of id: " + draft.getAuthorId());
             votesReceived.put(draft.getAuthorId(), true);
         }
         if(hasMajorityVotes())
         {
-            logger.info("Got majority of votes - acquiring leadership");
+            this.logger.info("Got majority of votes - acquiring leadership");
             acquireLeadership();
         }
     }
@@ -519,9 +531,9 @@ public class RaftNode
     private void acquireLeadership()
     {
         role = Role.LEADER;
-        logger.info("Role switched to LEADER");
+        this.logger.info("Role switched to LEADER");
         streamConnectionManager.sendToAll(draftEmptyHeartbeat());
-        logger.info("Sent first heartbeat after acquiring leadership.");
+        this.logger.info("Sent first heartbeat after acquiring leadership.");
     }
 
     private boolean hasMajorityVotes()

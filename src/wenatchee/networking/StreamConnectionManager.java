@@ -1,5 +1,6 @@
 package wenatchee.networking;
 
+import wenatchee.node.RaftNode;
 import wenatchee.protocol.Draft;
 
 import java.io.IOException;
@@ -8,14 +9,12 @@ import java.net.InetSocketAddress;
 import java.nio.channels.*;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
-import org.apache.log4j.Logger;
+import java.util.logging.Logger;
 
 // TODO Reconnets
 
 public class StreamConnectionManager implements Runnable
 {
-    final Logger logger = Logger.getLogger(StreamConnectionManager.class);
-
     HashMap<Byte, Identity> idToIdentityMap;
     HashMap<Byte, ClientStreamSession> idToPeerSessionMap;
     HashMap<String, Identity> addressToIdentityMap;
@@ -29,11 +28,12 @@ public class StreamConnectionManager implements Runnable
     int peerCount;
     int connectedPeerCount;
     boolean peersConnected;
+    Logger logger;
 
     //TODO: think about unifying identities representation as map
-    public StreamConnectionManager(Identity[] identities, int port, int bufferSize, BlockingQueue<Draft> receivedDrafts) throws IOException
+    public StreamConnectionManager(Identity[] identities, int port, int bufferSize, BlockingQueue<Draft> receivedDrafts, Logger logger) throws IOException
     {
-        logger.info("[SET-UP] Building connection manager");
+        this.logger = logger;
         this.idToIdentityMap = new HashMap<>();
         this.idToPeerSessionMap = new HashMap<>();
         this.addressToIdentityMap = new HashMap<>();
@@ -70,7 +70,7 @@ public class StreamConnectionManager implements Runnable
 
         Thread t = new Thread(() ->
         {
-            logger.info("[SET-UP] ConnManager started a new thread to connect with peers");
+            this.logger.info("[SET-UP] ConnManager started a new thread to connect with peers");
             try
             {
                 establishConnectionWithPeers();
@@ -80,8 +80,8 @@ public class StreamConnectionManager implements Runnable
             {
                 e.printStackTrace();
             }
-            logger.info("[SET-UP] ConnManager successfully connected with peers");
-            logger.info("[SET-UP] Closing active connector thread");
+            this.logger.info("[SET-UP] ConnManager successfully connected with peers");
+            this.logger.info("[SET-UP] Closing active connector thread");
         });
 
         t.start();
@@ -131,7 +131,7 @@ public class StreamConnectionManager implements Runnable
                                 // If for given ID connection was created before, new connection invalidates the older;
                                 // Thus, channel is closed and replaced
                                 String remoteAddress = ((InetSocketAddress) client.getRemoteAddress()).getAddress().toString().replace("/", "");
-                                logger.info("[N] Incoming connection from " + remoteAddress);
+                                this.logger.info("[N] Incoming connection from " + remoteAddress);
                                 byte id = addressToIdentityMap.get(remoteAddress).id;
                                 ClientStreamSession newPeerSession = new ClientStreamSession(client, bufferSize, receivedDrafts);
                                 if(idToPeerSessionMap.get(id) != null)
@@ -210,7 +210,7 @@ public class StreamConnectionManager implements Runnable
             try
             {
                 senderSocket.connect(new InetSocketAddress(identity.ipAddress, port));
-                logger.info("[N] Connected to " + identity.ipAddress);
+                this.logger.info("[N] Connected to " + identity.ipAddress);
                 ClientStreamSession newPeerSession = new ClientStreamSession(senderSocket, bufferSize, receivedDrafts);
                 senderSocket.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE, newPeerSession);
                 idToPeerSessionMap.put(identity.id, newPeerSession);

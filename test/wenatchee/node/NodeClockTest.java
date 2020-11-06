@@ -7,20 +7,31 @@ class NodeClockTest
     @Test
     void testClock() throws InterruptedException
     {
+        System.out.println("Heartbeat timeout: " + RaftNode.HEARTBEAT_TIMEOUT);
+        System.out.println("Election timeout bounds: " + RaftNode.ELECTION_TIMEOUT_BOUNDS[0] + ", " + RaftNode.ELECTION_TIMEOUT_BOUNDS[1]);
+
+        System.out.println("Creating new clock");
         NodeClock nodeClock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
-        System.out.println(nodeClock.getRunningTime());
-        System.out.println(nodeClock.getRunningTime());
-        System.out.println(nodeClock.getRunningTimeMilis());
-        System.out.println(nodeClock.getTimeToElectionTimeoutMilis());
+        System.out.println("Current running time nano: " + nodeClock.getRunningTime());
+        System.out.println("Current running time nano: " + nodeClock.getRunningTime());
+        System.out.println("Current running time milis: " + nodeClock.getRunningTimeMilis());
+        System.out.println("Time to election timeout milis: " + nodeClock.getTimeToElectionTimeoutMilis());
 
+        System.out.println("Sleeping 20 milliseconds");
         Thread.sleep(20);
-        System.out.println(nodeClock.getTimeToElectionTimeoutMilis());
+        System.out.println("Time to election timeout milis: " + nodeClock.getTimeToElectionTimeoutMilis());
+        System.out.println("Resetting election timeout start moment");
         nodeClock.resetElectionTimeoutStartMoment();
-        System.out.println(nodeClock.getTimeToElectionTimeoutMilis());
+        System.out.println("Time to election timeout in milis: " +nodeClock.getTimeToElectionTimeoutMilis());
 
+        System.out.println("Resetting timeout values");
         nodeClock.resetHeartbeatTimeoutStartMoment();
         nodeClock.resetElectionTimeoutStartMoment();
+        System.out.println("Sleeping for more than election timeout max value");
         Thread.sleep(RaftNode.ELECTION_TIMEOUT_BOUNDS[1] + RaftNode.HEARTBEAT_TIMEOUT + 10);
+        System.out.println("Assertions: time to election timeout and to hearbeat timeout < 0: "
+                + nodeClock.getTimeToElectionTimeoutMilis() + " "
+                + nodeClock.getTimeToHeartbeatTimeoutMilis());
         Assertions.assertTrue(nodeClock.getTimeToElectionTimeoutMilis() < 0);
         Assertions.assertTrue(nodeClock.getTimeToHeartbeatTimeoutMilis() < 0);
         Assertions.assertTrue(nodeClock.electionTimeouted());
