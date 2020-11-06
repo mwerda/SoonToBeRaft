@@ -88,9 +88,9 @@ public class RaftNode
     Identity[] peers;
     MetaCollector metaCollector;
 
-    public RaftNode() throws IOException
+    public RaftNode(int configId) throws IOException
     {
-        this(DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_PORT, DEFAULT_CONFIG_FILEPATH);
+        this(DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_PORT, DEFAULT_CONFIG_FILEPATH, configId);
     }
 
     public void logInfo(String msg)
@@ -102,7 +102,7 @@ public class RaftNode
         this.logger.severe(msg);
     }
 
-    public RaftNode(int heartbeatTimeout, int port, String configFilePath) throws IOException
+    public RaftNode(int heartbeatTimeout, int port, String configFilePath, int configId) throws IOException
     {
         this.logger = Logger.getLogger(RaftNode.class.getName());
 
@@ -128,18 +128,18 @@ public class RaftNode
         this.executorService = Executors.newCachedThreadPool();
 
         this.votesReceived = new HashMap<>();
-        discoverClusterIdentities(configFilePath);
+        discoverClusterIdentities(configFilePath, configId);
         streamConnectionManager = new StreamConnectionManager(peers, port, DEFAULT_BUFFER_SIZE, receivedDrafts, this.logger);
         this.id = this.identity.getId();
         this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
         this.logger.info("[SET-UP] RaftNode was built, id: " + this.id);
     }
 
-    public RaftNode(int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
-    {
-        this(heartbeatTimeout, port, configFilePath);
-        metaCollector = new MetaCollector(testSize);
-    }
+//    public RaftNode(int heartbeatTimeout, int port, String configFilePath, int testSize) throws IOException
+//    {
+//        this(heartbeatTimeout, port, configFilePath);
+//        metaCollector = new MetaCollector(testSize);
+//    }
 
     public void runNode()
     {
@@ -351,12 +351,13 @@ public class RaftNode
     /**
      * Builds identity array out of config file
      */
-    private void discoverClusterIdentities(String configFilePath) throws FileNotFoundException
+    private void discoverClusterIdentities(String configFilePath, int configId) throws FileNotFoundException
     {
         this.logger.info("[SET-UP] Reading config file");
         LinkedList<String> myNetworkAddresses = getMyNetworkAddresses();
         LinkedList<Identity> clusterIdentities = getClusterIdentities(configFilePath);
-        setOwnIdentity(myNetworkAddresses, clusterIdentities);
+        Identity ownIdentity = clusterIdentities.get(configId);
+        setOwnIdentity(myNetworkAddresses, ownIdentity);
 
         //TODO make a function to cast linked list to array, class as arg
         Identity[] identityArray = new Identity[clusterIdentities.size()];
@@ -370,22 +371,19 @@ public class RaftNode
 
     private void setOwnIdentity(
             LinkedList<String> myNetworkAddresses,
-            LinkedList<Identity> clusterIdentities
+            Identity ownIdentity
     ) throws IdentityUnknownException
     {
         boolean ownIdentitySet = false;
-        for(Identity identity : clusterIdentities)
+        for(String address : myNetworkAddresses)
         {
-            for(String address : myNetworkAddresses)
+            if(address != null && ownIdentity != null && address.equals(ownIdentity.getIpAddress()))
             {
-                if(address != null && identity != null && address.equals(identity.getIpAddress()))
-                {
-                    this.identity = new Identity(identity);
-                    clusterIdentities.remove(identity);
-                    ownIdentitySet = true;
-                    // micro-opt
-                    break;
-                }
+                this.identity = new Identity(ownIdentity);
+//                clusterIdentities.remove(identity);
+                ownIdentitySet = true;
+                // micro-opt
+                break;
             }
         }
 
