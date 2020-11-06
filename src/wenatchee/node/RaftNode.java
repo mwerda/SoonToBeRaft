@@ -49,7 +49,7 @@ public class RaftNode
 
     Logger logger;
 
-    public final static long[] ELECTION_TIMEOUT_BOUNDS = {8000, 12000};//{150, 300};
+    public final static long[] ELECTION_TIMEOUT_BOUNDS = {3000, 4000};//{150, 300};
     public final static int HEARTBEAT_TIMEOUT = 40;
     final static int CLOCK_SLEEP_TIME = 1;
     final static int DEFAULT_BUFFER_SIZE = 8192;
@@ -116,7 +116,7 @@ public class RaftNode
         this.knownDraftNumber = -1;
         //hardcoded for 2 nodes TODO move to config file handler
         this.startedElection = false;
-        this.votedFor = new int[]{-1, -1};
+        this.votedFor = new int[]{-1, -1, -1};
         this.role = Role.FOLLOWER;
 
         raftEntries = new LinkedBlockingQueue<>();
