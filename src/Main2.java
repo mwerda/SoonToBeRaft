@@ -13,7 +13,8 @@ public class Main2
         RemoteClient client = new RemoteClient();
         try
         {
-            client.start2(args[0]);
+            return;
+            //client.start2(args[0]);
         } catch (Exception e)
         {
             System.out.println(e.toString());

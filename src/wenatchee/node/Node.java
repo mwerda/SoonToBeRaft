@@ -18,9 +18,9 @@ public class Node
     RemoteServer rmiServer;
     RemoteServant rmiServant;
 
-    RaftNodeLight raftNodeLight;
+    public RaftNodeLight raftNodeLight;
 
-    public Node(int configId, int rmiPort, int udpPort)
+    public Node(int configId, int rmiPort, int udpPort, boolean listenerNode)
     {
         module = "Node" + String.valueOf(configId);
         Lg.l.appendToHashMap(module, "");
@@ -35,10 +35,11 @@ public class Node
         try
         {
             this.raftNodeLight = new RaftNodeLight(
-                    RaftNodeLight.DEFAULT_HEARTBEAT_TIMEOUT,
+                    RaftNodeLight.DEFAULT_HEARTBEAT_TIMEOUT * 100,
                     this.udpPort,
                     RaftNodeLight.DEFAULT_CONFIG_FILEPATH,
-                    this.configId
+                    this.configId,
+                    listenerNode
             );
         }
         catch(Exception e)
@@ -64,4 +65,8 @@ public class Node
         }
     }
 
+    public void startNode()
+    {
+        this.raftNodeLight.runNode();
+    }
 }

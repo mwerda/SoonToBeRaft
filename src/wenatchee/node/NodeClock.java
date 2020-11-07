@@ -17,7 +17,7 @@ public class NodeClock
     private Random randomizer;
 
 
-    NodeClock(long heartbeatTimeoutMilis)
+    NodeClock(long[] electionTimeoutBounds, long heartbeatTimeoutMilis)
     {
         this.randomizer = new Random();
         //this.electionTimeoutBounds = electionTimeoutBoundsMilis;

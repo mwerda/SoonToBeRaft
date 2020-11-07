@@ -198,6 +198,11 @@ public class Draft implements Serializable
         return true;
     }
 
+    public DraftType getType()
+    {
+        return draftType;
+    }
+
     public int getTerm()
     {
         return term;

@@ -16,6 +16,7 @@ package wenatchee.node; /**
 import wenatchee.exceptions.IdentityUnknownException;
 import wenatchee.logging.Lg;
 import wenatchee.networking.Identity;
+import wenatchee.networking.RemoteClient;
 import wenatchee.networking.StreamConnectionManager;
 import wenatchee.protocol.Draft;
 import wenatchee.protocol.RaftEntry;
@@ -24,14 +25,19 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.logging.Logger;
 
 public class RaftNodeLight
 {
+    private boolean slowdown = true;
+    private Mode mode;
+
     //TODO
     public boolean appendEntries(Draft draft)
     {
@@ -43,7 +49,7 @@ public class RaftNodeLight
     {
         FOLLOWER,
         CANDIDATE,
-        LEADER
+        LEADER;
     }
 
     /**
@@ -55,13 +61,14 @@ public class RaftNodeLight
         LISTENER
     }
 
-    static String module = "RaftNode";
+    static String module = "RaftNodeLight";
 
-    //public final static long[] ELECTION_TIMEOUT_BOUNDS = {3000, 4000};//{150, 300};
+    public final static long[] ELECTION_TIMEOUT_BOUNDS = {3000, 4000};//{150, 300};
     //public final static int HEARTBEAT_TIMEOUT = 500;
     final static int CLOCK_SLEEP_TIME_MILIS = 1;
     //final static int DEFAULT_BUFFER_SIZE = 8192;
     final static int DEFAULT_HEARTBEAT_TIMEOUT = 200;
+    //final static int DEFAULT_CATCHUP_TIMEOUT = 50;
     final static int DEFAULT_PORT = 5000;
     final static String DEFAULT_CONFIG_FILEPATH = "src/configuration";
     private final static int DEFAULT_DRAFT_ELECTION_NUMBER = -1;
@@ -79,6 +86,9 @@ public class RaftNodeLight
     boolean startedElection;
     int[] votedFor;
 
+    VotingModule votingModule;
+    ErrorInjectionAndMetricsModule em;
+
     Role role;
     NodeClock clock;
 
@@ -90,6 +100,7 @@ public class RaftNodeLight
     BlockingQueue<RaftEntry> proposedDrafts;
     BlockingQueue<RaftEntry> log;
 
+    boolean catchupMode = false;
     ExecutorService executorService;
     StreamConnectionManager streamConnectionManager;
     Identity identity;
@@ -101,10 +112,19 @@ public class RaftNodeLight
         this(DEFAULT_HEARTBEAT_TIMEOUT, DEFAULT_PORT, DEFAULT_CONFIG_FILEPATH, configId);
     }
 
+    public RaftNodeLight(int heartbeatTimeout, int port, String configFilePath, int configId, boolean listener) throws IOException
+    {
+        this(heartbeatTimeout, port, configFilePath, configId);
+        if(listener)
+        {
+            this.mode = Mode.LISTENER;
+        }
+    }
 
     public RaftNodeLight(int heartbeatTimeout, int port, String configFilePath, int configId) throws IOException
     {
         Lg.l.appendToHashMap(RaftNodeLight.module, "Node");
+        this.em = new ErrorInjectionAndMetricsModule();
 
         this.id = configId;
 
@@ -128,10 +148,12 @@ public class RaftNodeLight
 
         this.executorService = Executors.newCachedThreadPool();
 
-        this.votesReceived = new HashMap<>();
+        //this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath, configId);
 
-        this.clock = new NodeClock(RaftNodeLight.DEFAULT_HEARTBEAT_TIMEOUT);
+        this.votingModule = new VotingModule(this.peers.length + 1);
+
+        this.clock = new NodeClock(RaftNodeLight.ELECTION_TIMEOUT_BOUNDS, RaftNodeLight.DEFAULT_HEARTBEAT_TIMEOUT);
 
         Lg.l.info(RaftNodeLight.module, " [SET-UP] RaftNodeLight was built, id: " + this.id);
     }
@@ -146,65 +168,88 @@ public class RaftNodeLight
 
     public void runNode(Mode mode)
     {
-        Lg.l.info(RaftNodeLight.module, " Running node");
 
-//        executorService.execute(() ->
-//        {
-//            Lg.l.info(RaftNodeLight.module, " [Thread] Receiver thread started");
-//            Thread.currentThread().setName("Receiver");
-//            runStreamConnectionManager();
-//        });
+        Lg.l.appendToHashMap("Receiver", "RaftNodeLight");
+        Lg.l.info(RaftNodeLight.module, " Running node");
 
         executorService.execute(() ->
         {
-            Lg.l.info(module, " [Thread] Consumer thread started");
-            Thread.currentThread().setName("Consumer");
+            Lg.l.info(RaftNodeLight.module, " [Thread] Receiver thread started");
+            Thread.currentThread().setName("Receiver");
             while(true)
             {
+                if(this.slowdown)
+                {
+                    Lg.l.info("Receiver", "Starting receiver loop. receivedDrafts count: " +
+                            this.receivedDrafts.size() + " Receiver loops: " + this.em.consumerThreadSpins);
+                    try {
+                        Thread.sleep(this.em.threadLoopSlowdown);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    this.em.receiverThreadSpins += 1;
+                }
+
                 if(!receivedDrafts.isEmpty())
                 {
-                    Draft draft = receivedDrafts.poll();
-                    if(metaCollector != null)
-                    {
-                        metaCollector.markDraftReceived(draft.getTerm());
-                        metaCollector.tickMeanValue(draft.getSize());
-                    }
-
-                    if(draft.getTerm() < getNodeTerm())
-                    {
-                        continue;
-                    }
-                    else
-                    {
-                        if(draft.getTerm() > getNodeTerm())
-                        {
-                            setNodeTerm(draft.getTerm());
-                        }
-                    }
-
-                    if(draft.isHeartbeat())
-                    {
-                        //processHeartbeat(draft);
-                    }
-                    else if(draft.isVoteForCandidate())
-                    {
-                        processVoteForCandidate(draft);
-                    }
-                    else if(draft.isVoteRequest())
-                    {
-                        if(draft.getKnownDraftNumber() == knownDraftNumber && draft.getKnownTerm() == nodeTerm + 1)
-                        {
-                            grantVote(draft.getLeaderID());
-                        }
-                    }
+                    processDraftMessage(receivedDrafts.poll());
                 }
             }
         });
 
-        if(mode != Mode.LISTENER)
+//        executorService.execute(() ->
+//        {
+//            Lg.l.info(module, " [Thread] Consumer thread started");
+//            Thread.currentThread().setName("Consumer");
+//            while(true)
+//            {
+//                if(!receivedDrafts.isEmpty())
+//                {
+//                    Draft draft = receivedDrafts.poll();
+//                    if(metaCollector != null)
+//                    {
+//                        metaCollector.markDraftReceived(draft.getTerm());
+//                        metaCollector.tickMeanValue(draft.getSize());
+//                    }
+//
+//                    if(draft.getTerm() < getNodeTerm())
+//                    {
+//                        continue;
+//                    }
+//                    else
+//                    {
+//                        if(draft.getTerm() > getNodeTerm())
+//                        {
+//                            setNodeTerm(draft.getTerm());
+//                        }
+//                    }
+//
+//                    if(draft.isHeartbeat())
+//                    {
+//                        //processHeartbeat(draft);
+//                    }
+//                    else if(draft.isVoteForCandidate())
+//                    {
+//                        processVoteForCandidate(draft);
+//                    }
+//                    else if(draft.isVoteRequest())
+//                    {
+//                        if(draft.getKnownDraftNumber() == knownDraftNumber && draft.getKnownTerm() == nodeTerm + 1)
+//                        {
+//                            grantVote(draft.getLeaderID());
+//                        }
+//                    }
+//                }
+//            }
+//        });
+
+        if(this.mode != Mode.LISTENER)
         {
             executorService.execute(() ->
             {
+                Lg.l.appendToHashMap("Clock", "RaftNodeLight");
+                this.clock.resetElectionTimeoutStartMoment();
+                this.clock.resetHeartbeatTimeoutStartMoment();
 
                 Lg.l.info(module, " [Thread] Clock thread started");
                 Thread.currentThread().setName("Clock");
@@ -229,6 +274,18 @@ public class RaftNodeLight
                     catch (InterruptedException e)
                     {
                         e.printStackTrace();
+                    }
+
+                    if(this.slowdown)
+                    {
+                        Lg.l.info("Clock", "Starting clock loop " +
+                                " Clock loops: " + this.em.clockThreadSpins);
+                        try {
+                            Thread.sleep(this.em.threadLoopSlowdown);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        this.em.clockThreadSpins += 1;
                     }
                 }
             });
@@ -325,18 +382,151 @@ public class RaftNodeLight
 //        //return new Draft(Draft.DraftType.HEARTBEAT, nodeTerm, id, raftEntries.toArray(new RaftEntry[raftEntries.size()]));
 //    }
 
+    void processDraftMessage(Draft draft)
+    {
+        // end of communication cases
+        if(draft.getKnownTerm() < this.nodeTerm)
+        {
+            // drop the message
+            return;
+        }
+        if(draft.getType() == Draft.DraftType.REFUSE_VOTE || draft.getType() == Draft.DraftType.VOTE_FOR_CANDIDATE)
+        {
+            //processVoteRequestAnswer();
+        }
+
+        if(draft.getKnownTerm() > this.nodeTerm)
+        {
+            int currentTerm = this.nodeTerm;
+            HashMap<String, Integer> atomicMap = new HashMap<String, Integer>()
+            {{
+                put("addTerm", draft.getKnownTerm() - currentTerm);
+            }};
+            String context = "Bumping up current term as incoming Draft knows higher term.";
+            int draftDifference = draft.getKnownDraftNumber() - this.draftNumber;
+            if(draftDifference > 1 && draft.getAuthorId() == draft.getLeaderID())
+            {
+                atomicMap.put("setCatchupStart", this.draftNumber);
+                context += " Known Draft number is also higher - starting catchup mechanism.";
+                atomicMap.put("resetVotingModule", 1);
+            }
+            atomicStateChange(atomicMap);
+        }
+
+        if(draft.getType() == Draft.DraftType.HEARTBEAT)
+        {
+            //processHeartbeat(draft);
+        }
+        if(draft.getType() == Draft.DraftType.REQUEST_VOTE)
+        {
+            processVoteRequest(draft);
+        }
+    }
+    void processVoteRequest(Draft draft)
+    {
+        if(draft.getKnownTerm() < this.nodeTerm)
+        {
+            //voteRequestReply(VotingCondition.REFSUED);
+        }
+        //if vote
+        // TODO numer wiadomosci ostatniej zacommitowanej
+        if(this.votingModule.tryGrantVote(draft.getTerm(), draft.getKnownDraftNumber(), draft.getAuthorId()))
+        {
+            this.outgoingDrafts.add(new Draft(
+                    Draft.DraftType.VOTE_FOR_CANDIDATE,
+                    (byte)this.id,
+                    this.knownLeaderId,
+                    this.nodeTerm,
+                    this.draftNumber,
+                    -1,
+                    -1,
+                    new RaftEntry[0]
+            ));
+        }
+    }
+
     void startNewElections()
     {
         Lg.l.info(module, " Election timeout reached: starting new election");
         clock.resetElectionTimeoutStartMoment();
         Lg.l.info(RaftNodeLight.module, " Node switching to CANDIDATE state");
-        role = Role.CANDIDATE;
 
-        startedElection = true;
-        knownLeaderId = -1;
-        nodeTerm++;
-        // sclitreamConnectionManager.sendToAll(draftNewElection());
+        atomicStateChange(new HashMap<String, Integer>()
+        {{
+            put("setLeaderId", -1);
+            put("setRole", 1);
+            put("addTerm", 1);
+            put("addDraftCount", 1);
+            put("askedForVotes", 1);
+        }});
+        this.votingModule.restartVotingModule(this.nodeTerm, this.draftNumber, this.id);
+        remoteRequestVotes();
         Lg.l.info(RaftNodeLight.module, " Sent to all: new election request");
+    }
+
+//    put("setLeaderId", -1),
+//    put("setRole", 2),
+//    put("addTerm", 1),
+//    put("addDraftCount", 1)
+//    put("askedForVotes", 1);
+//atomicMap.put("setCatchupStart", this.draftNumber);
+//atomicMap.put("resetVotingModule", 1);
+//    "finishedElections"
+    // To make sure there is no conflict of interest between threads modifying state of node
+    private synchronized void atomicStateChange(HashMap<String, Integer> changedValues)
+    {
+        if(this.slowdown)
+        {
+            this.em.atomicSetCalls += 1;
+            Lg.l.info("atomicStateChange", "atomicStateChange calls: " + this.em.atomicSetCalls);
+        }
+
+        if(changedValues.get("context") != null)
+        {
+            Lg.l.info(module, "atomicStateChange, context: " + changedValues.get("context"));
+        }
+
+        if(changedValues.get("setLeaderId") != null)
+        {
+            this.knownLeaderId = changedValues.get("setLeaderId").byteValue();
+            Lg.l.info(module, "atomic setLeaderId: " + changedValues.get("setLeaderId").byteValue());
+        }
+        if(changedValues.get("setRole") != null)
+        {
+            this.setRole(Role.values()[changedValues.get("setRole")]);
+            Lg.l.info(module, "atomic setRole: " + Role.values()[changedValues.get("setRole")]);
+        }
+        if(changedValues.get("addTerm") != null)
+        {
+            this.nodeTerm += changedValues.get("addTerm");
+            Lg.l.info(module, "atomic addTerm: " + changedValues.get("addTerm"));
+        }
+        if(changedValues.get("addDraftCount") != null)
+        {
+            this.draftNumber += changedValues.get("addDraftCount");
+            Lg.l.info(module, "atomic addDraftCount: " + changedValues.get("addDraftCount"));
+        }
+        if(changedValues.get("askedForVotes") != null)
+        {
+            this.startedElection = true;
+            Lg.l.info(module, "atomic startedElection = true");
+        }
+        if(changedValues.get("finishedElections") != null)
+        {
+            this.startedElection = false;
+            Lg.l.info(module, "atomic startedElection = false");
+        }
+        if(changedValues.get("setCatchupStart") != null)
+        {
+            this.catchupMode = true;
+            Lg.l.info(module, "atomic starting catchup mode");
+        }
+        if(changedValues.get("resetVotingModule") != null)
+        {
+            this.votingModule.restartVotingModule(this.nodeTerm, this.draftNumber, -1);
+        }
+        //atomicMap.put("setCatchupStart", this.draftNumber);
+//atomicMap.put("resetVotingModule", 1);
     }
 
 //    private void processHeartbeat(Draft draft)
@@ -414,7 +604,7 @@ public class RaftNodeLight
             String[] line = inputStream.next().split(",");
             identities.add(new Identity(line[0], Integer.parseInt(line[1]), (byte) Integer.parseInt(line[2])));
             nodesInCluster++;
-            votesReceived.put((byte) Integer.parseInt(line[2]), Boolean.FALSE);
+            //votesReceived.put((byte) Integer.parseInt(line[2]), Boolean.FALSE);
         }
 
         inputStream.close();
@@ -485,7 +675,7 @@ public class RaftNodeLight
 
     private Draft draftNewElection()
     {
-        draftNumber++;
+        //draftNumber++;
         return new Draft(
                 Draft.DraftType.REQUEST_VOTE,
                 (byte)id,
@@ -520,27 +710,27 @@ public class RaftNodeLight
         );
     }
 
-    private void processVoteForCandidate(Draft draft)
-    {
-        if(startedElection && draft.getTerm() == nodeTerm)
-        {
-            Lg.l.info(RaftNodeLight.module, " Received a vote for term " + draft.getTerm() + " from node of id: " + draft.getAuthorId());
-            votesReceived.put(draft.getAuthorId(), true);
-        }
-        if(hasMajorityVotes())
-        {
-            Lg.l.info(RaftNodeLight.module, " Got majority of votes - acquiring leadership");
-            acquireLeadership();
-        }
-    }
+//    private void processVoteForCandidate(Draft draft)
+//    {
+//        if(startedElection && draft.getTerm() == nodeTerm)
+//        {
+//            Lg.l.info(RaftNodeLight.module, " Received a vote for term " + draft.getTerm() + " from node of id: " + draft.getAuthorId());
+//            votesReceived.put(draft.getAuthorId(), true);
+//        }
+//        if(hasMajorityVotes())
+//        {
+//            Lg.l.info(RaftNodeLight.module, " Got majority of votes - acquiring leadership");
+//            acquireLeadership();
+//        }
+//    }
 
-    private void acquireLeadership()
-    {
-        role = Role.LEADER;
-        Lg.l.info(RaftNodeLight.module, " Role switched to LEADER");
-        streamConnectionManager.sendToAll(draftEmptyHeartbeat());
-        Lg.l.info(RaftNodeLight.module, " Sent first heartbeat after acquiring leadership.");
-    }
+//    private void acquireLeadership()
+//    {
+//        role = Role.LEADER;
+//        Lg.l.info(RaftNodeLight.module, " Role switched to LEADER");
+//        streamConnectionManager.sendToAll(draftEmptyHeartbeat());
+//        Lg.l.info(RaftNodeLight.module, " Sent first heartbeat after acquiring leadership.");
+//    }
 
     private boolean hasMajorityVotes()
     {
@@ -570,6 +760,76 @@ public class RaftNodeLight
                 new RaftEntry[0]
         );
     }
+
+    //
+    public void remoteRequestVotes()
+    {
+        Draft reqVotes = draftNewElection();
+        for(Identity i : this.peers)
+        {
+            this.executorService.execute(new sendDraftToIdentity(i, reqVotes));
+        }
+    }
+
+//    public String present()
+//    {
+//        String s = "configId: " + this.conf
+//    }
+
+    public class sendDraftToIdentity implements Runnable
+    {
+        Identity identity;
+        Draft draft;
+        public sendDraftToIdentity(Identity identity, Draft draft)
+        {
+            this.identity = identity;
+            this.draft = draft;
+        }
+
+        @Override
+        public void run()
+        {
+            try {
+                new RemoteClient().deliverDraft(this.identity.getRemoteAddress(), this.draft);
+            } catch (NotBoundException e) {
+                e.printStackTrace();
+                Lg.l.severe("Draft send exception", e.toString());
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+                Lg.l.severe("Draft send exception", e.toString());
+            } catch (RemoteException e) {
+                e.printStackTrace();
+                Lg.l.severe("Draft send exception", e.toString());
+            }
+        }
+    }
+
+    public void enqueue(Draft draft)
+    {
+        this.receivedDrafts.add(draft);
+    }
+}
+
+class ErrorInjectionAndMetricsModule
+{
+    long draftsInOutQueue;
+    long draftsInInQueue;
+    long clockThreadSpins;
+    long receiverThreadSpins;
+    long consumerThreadSpins;
+    long atomicSetCalls;
+
+    long threadLoopSlowdown = 10000;
+
+    public ErrorInjectionAndMetricsModule()
+    {
+        this.draftsInInQueue = 0;
+        this.draftsInOutQueue = 0;
+        this.clockThreadSpins = 0;
+        this.receiverThreadSpins = 0;
+        this.consumerThreadSpins = 0;
+        this.atomicSetCalls = 0;
+    }
 }
 
 // NO VOTES WILL COME FROM LAGGING NODES
@@ -579,21 +839,23 @@ class VotingModule
     String module = "VotingModule";
 
     //int[] votes;
+    int myVoteTerm;
+    int myVoteId;
     int term;
     int lastKnownDraft;
     int requestorId;
     int clusterSize;
-    HashMap<Integer, Draft> votes;
+    HashSet<Draft> votes;
 
     public VotingModule(int clusterSize)
     {
         Lg.l.appendToHashMap(module, "RaftNodeLight");
         Lg.l.info(module, "Creating Voting Module");
         this.clusterSize = clusterSize;
-        votes = this.nullifyVotes();
+        votes = new HashSet<>();
     }
 
-    public void(int term, int lastKnownDraft, int requestorId)
+    public void restartVotingModule(int term, int lastKnownDraft, int requestorId)
     {
         Lg.l.info(module, "Resetting voting module. " +
                 " term: " + term +
@@ -603,53 +865,77 @@ class VotingModule
         this.term = term;
         this.lastKnownDraft = lastKnownDraft;
         this.requestorId = requestorId;
-        this.votes = nullifyVotes();
+        this.votes = new HashSet<>();
     }
 
-    public HashMap<Integer, Draft> nullifyVotes()
+    public boolean tryGrantVote(int term, int lastCommitedDraft, int id)
     {
-        HashMap<Integer, Draft> nullMap = new HashMap<>();
-        for(int i = 0; i < this.clusterSize; i++)
+
+
+        if(this.myVoteTerm < term)
         {
-            // This approach lets definitively know when negative answer is provided.
-            nullMap.put(i, null);
+            this.myVoteId = id;
+            this.myVoteTerm = term;
+            return true;
         }
-        return nullMap;
+        return false;
     }
 
-    public void updateVote(int id, Draft vote)
+//    public HashMap<Integer, Draft> nullifyVotes()
+//    {
+//        HashMap<Integer, Draft> nullMap = new HashMap<>();
+//        for(int i = 0; i < this.clusterSize; i++)
+//        {
+//            // This approach lets definitively know when negative answer is provided.
+//            nullMap.put(i, null);
+//        }
+//        return nullMap;
+//    }
+
+    public void processVote(Draft vote)
     {
-        this.votes.put(id, vote);
+        this.votes.add(vote);
     }
 
     // -1 undefined
     // 0 definitive no
     // 1 accepted as leader
     // Run every single time when a vote comes in or incoming term is higher
-    public int getVotingStatus()
+    VotingCondition getVotingStatus()
     {
         int grantCount = 0;
         int refuseCount = 0;
-        float threshold = (float)this.votes.length / 2;
+        float threshold = (float)this.clusterSize / 2;
 
-        for(int vote : this.votes)
+        for(Draft draft : this.votes)
         {
-            if(vote == 1)
+            if(draft.getType() == Draft.DraftType.VOTE_FOR_CANDIDATE)
             {
-                oneCount += 1;
+                grantCount += 1;
             }
-            else if(vote == 0)
+            // if REFUSE was provided, current leader ID will also be provided, else timeout
+            else if(draft.getType() == Draft.DraftType.REFUSE_VOTE)
             {
-                zeroCount += 1;
+                refuseCount += 1;
             }
 
             // If zeroCount > threshold, restart voting or give up if this node is the one lagging behind
             // If oneCount > threshold, acquire leadership
             // If neither, wait for more votes or term change
-            if(zeroCount > threshold)
-            {
-                return RaftNodeLight.VOTES_DENIED
-            }
         }
+        // TODO co to oznacza?
+        if(refuseCount > threshold)
+            return VotingCondition.REFSUED;
+        else if(grantCount > threshold)
+            return VotingCondition.ACCEPTED;
+        else return VotingCondition.UNDETERMINED;
     }
+}
+
+enum VotingCondition
+{
+    REFSUED,
+    ACCEPTED,
+    LEADER_KNOWN,
+    UNDETERMINED
 }

@@ -7,6 +7,6 @@ import java.rmi.RemoteException;
 
 public interface MessengerService extends Remote
 {
-    public String sendMessage(String clientMessage) throws RemoteException;
-    public Draft deliverDraft(Draft draft) throws RemoteException;
+    //public String sendMessage(String clientMessage) throws RemoteException;
+    public void deliverDraft(Draft draft) throws RemoteException;
 }

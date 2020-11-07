@@ -41,4 +41,6 @@ public class Identity
     {
         return id;
     }
+
+    public String getRemoteAddress() { return this.remoteAddress; }
 }

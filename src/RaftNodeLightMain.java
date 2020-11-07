@@ -6,6 +6,6 @@ public class RaftNodeLightMain
 {
     public static void main(String[] args) throws IOException, InterruptedException
     {
-        Node node = new Node(0, 5000, 6000);
+        Node node = new Node(0, 5000, 6000, false);
     }
 }
