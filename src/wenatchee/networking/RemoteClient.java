@@ -52,7 +52,7 @@ public class RemoteClient
                 Draft.DraftType.HEARTBEAT, (byte)0, (byte)1, 2, 2, 3, 3, new RaftEntry[0]
         );
 
-        String address = "rmi://10.0.0." + lastDigit + "5100/deliverdraft";
+        String address = "rmi://10.0.0." + lastDigit + ":5100/deliverdraft";
         MessengerService service = (MessengerService) Naming.lookup(address);
         //MessengerService service2 = (MessengerService) Naming.lookup("rmi://169.254.204.245:5100/hello");
         System.out.println(service.sendMessage("Hey server " + service.getClass().getName()));
