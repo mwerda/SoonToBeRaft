@@ -42,6 +42,6 @@ public class Main
 ////        cluster.addNode(node1);
 ////        cluster.addNode(node2);
 
-        Thread.sleep(30000);
+        Thread.sleep(300000);
     }
 }

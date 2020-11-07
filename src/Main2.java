@@ -11,9 +11,11 @@ public class Main2
 //        rs.startServer(port);
 
         RemoteClient client = new RemoteClient();
-        try {
-            client.start2();
-        } catch (Exception e) {
+        try
+        {
+            client.start2(args[0]);
+        } catch (Exception e)
+        {
             System.out.println(e.toString());
         }
     }
