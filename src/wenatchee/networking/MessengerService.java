@@ -9,8 +9,4 @@ public interface MessengerService extends Remote
 {
     public String sendMessage(String clientMessage) throws RemoteException;
     public Draft deliverDraft(Draft draft) throws RemoteException;
-//
-//    public boolean appendEntries(Draft draft);
-//    public boolean requestVote(Draft draft);
-
 }

@@ -17,10 +17,10 @@ public class NodeClock
     private Random randomizer;
 
 
-    NodeClock(long[] electionTimeoutBoundsMilis, long heartbeatTimeoutMilis)
+    NodeClock(long heartbeatTimeoutMilis)
     {
         this.randomizer = new Random();
-        this.electionTimeoutBounds = electionTimeoutBoundsMilis;
+        //this.electionTimeoutBounds = electionTimeoutBoundsMilis;
         this.heartbeatTimeoutMilis = heartbeatTimeoutMilis;
         this.startTime = System.nanoTime();
 
@@ -28,7 +28,7 @@ public class NodeClock
         this.heartbeatTimeoutStartMoment = startTime;
         this.unboundTimer = startTime;
 
-        this.randomizeElectionTimeout();
+        //this.randomizeElectionTimeout();
     }
 
     public long getElectionTimeoutMilis()

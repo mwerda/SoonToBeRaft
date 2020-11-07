@@ -46,9 +46,10 @@ public class Draft implements Serializable
     {
         HEARTBEAT((byte) 1),
         VOTE_FOR_CANDIDATE((byte) 2),
-        REQUEST_VOTE((byte) 3);
+        REQUEST_VOTE((byte) 3),
+        REFUSE_VOTE((byte) 4);
 
-        private byte value;
+        public byte value;
 
         DraftType(byte value)
         {
