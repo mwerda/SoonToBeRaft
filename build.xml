@@ -1,6 +1,7 @@
 <project default="compile">
     <target name="compile">
         <mkdir dir="out"/>
+        <exclude name="src/test/**" />
         <javac srcdir="src" destdir="out"/>
     </target>
 </project>
