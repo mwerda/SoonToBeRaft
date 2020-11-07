@@ -14,8 +14,8 @@ do
   cd "${repo}"
   git checkout elections_empty_beats
   out0=$(git fetch)
-  out1=$(git pull --rebase)
-  if [[ $out != "Already up to date."* ]]; then
+  out1=$(git status)
+  if [[ $out1 != *"Your branch is up to date with "* ]]; then
     echo "Not up to date"
     git reset --hard origin/elections_empty_beats
     ant
