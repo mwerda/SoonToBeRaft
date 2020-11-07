@@ -1,2 +1,6 @@
-package wenatchee.node;public class RemoteNode {
+package wenatchee.node;
+
+public class RemoteNode
+{
+
 }

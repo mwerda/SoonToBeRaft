@@ -1,5 +1,6 @@
 package wenatchee.protocol;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
@@ -18,7 +19,7 @@ import java.util.Arrays;
  * Overall 27 bytes at minimum. See RaftEntry javadoc for further explanation on how it is encapsulated in Draft.
  * 4 bytes describing Draft number are enough for 397 hours of communication with 1500 new Drafts emerging every second.
  */
-public class Draft
+public class Draft implements Serializable
 {
     private static final int BYTES_PER_SIZE = Integer.SIZE / Byte.SIZE;
     private static final int BYTES_PER_AUTHOR_ID = 1;
