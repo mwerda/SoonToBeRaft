@@ -7,7 +7,7 @@ repos=(
 echo ""
 echo "Getting latest for" ${#repos[@]} "repositories using pull --rebase"
 
-for repo in "${repos[@]}"m
+for repo in "${repos[@]}"
 do
   echo ""
   echo "****** Getting latest for" ${repo} "******"
