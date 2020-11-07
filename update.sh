@@ -11,7 +11,7 @@ for repo in "${repos[@]}"
 do
   echo ""
   echo "****** Getting latest for" ${repo} "******"
-  cd "${repo}"
+  cd "${repo}"mai
   git checkout elections_empty_beats
   out0=$(git fetch)
   out1=$(git status)
