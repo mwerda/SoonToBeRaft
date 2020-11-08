@@ -7,28 +7,30 @@ import java.util.concurrent.TimeUnit;
 
 public class NodeClock
 {
-    private long startTime;
+    static long[] electionTimeoutBounds = {3000, 4000};
+    static long[] heartbeatTimeoutBounds = {1500, 2000};
+
+    private final long startTime;
     private long electionTimeoutStartMoment;
     private long electionTimeoutMilis;
     private long heartbeatTimeoutStartMoment;
     private long heartbeatTimeoutMilis;
     private long unboundTimer;
-    private long[] electionTimeoutBounds;
+    //private long[] electionTimeoutBounds;
     private Random randomizer;
 
 
-    NodeClock(long[] electionTimeoutBounds, long heartbeatTimeoutMilis)
+    NodeClock()
     {
         this.randomizer = new Random();
-        //this.electionTimeoutBounds = electionTimeoutBoundsMilis;
-        this.heartbeatTimeoutMilis = heartbeatTimeoutMilis;
-        this.startTime = System.nanoTime();
+        this.startTime = System.currentTimeMillis();
 
-        this.electionTimeoutStartMoment = startTime;
-        this.heartbeatTimeoutStartMoment = startTime;
+        this.electionTimeoutStartMoment = this.startTime;
+        this.heartbeatTimeoutStartMoment = this.startTime;
         this.unboundTimer = startTime;
 
-        //this.randomizeElectionTimeout();
+        this.randomizeElectionTimeout();
+        this.randomizeHeartbeatTimeout();
     }
 
     public long getElectionTimeoutMilis()
@@ -43,28 +45,30 @@ public class NodeClock
 
     public long getTimeToElectionTimeoutMilis()
     {
-        return electionTimeoutMilis - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - electionTimeoutStartMoment);
+        //return electionTimeoutMilis - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - electionTimeoutStartMoment);
+        return electionTimeoutMilis - (System.currentTimeMillis() - this.electionTimeoutStartMoment);
     }
 
     public long getTimeToHeartbeatTimeoutMilis()
     {
-        return heartbeatTimeoutMilis - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - heartbeatTimeoutStartMoment);
+        //return heartbeatTimeoutMilis - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - heartbeatTimeoutStartMoment);
+        return heartbeatTimeoutMilis - (System.currentTimeMillis() - heartbeatTimeoutStartMoment);
     }
 
     public long getRunningTime()
     {
-        return System.nanoTime() - this.startTime;
+        return System.currentTimeMillis() - this.startTime;
     }
 
-    public long getRunningTimeMilis()
-    {
-        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - this.startTime);
-    }
+//    public long getRunningTimeMilis()
+//    {
+//        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - this.startTime);
+//    }
 
     public long measureUnbound()
     {
-        long elapsed = System.nanoTime() - unboundTimer;
-        unboundTimer = System.nanoTime();
+        long elapsed = System.currentTimeMillis() - unboundTimer;
+        unboundTimer = System.currentTimeMillis();
         return elapsed;
     }
 
@@ -80,18 +84,30 @@ public class NodeClock
 
     public void resetElectionTimeoutStartMoment()
     {
-        electionTimeoutStartMoment = System.nanoTime();
+        electionTimeoutStartMoment = System.currentTimeMillis();
     }
 
     public void resetHeartbeatTimeoutStartMoment()
     {
-        heartbeatTimeoutStartMoment = System.nanoTime();
+        heartbeatTimeoutStartMoment = System.currentTimeMillis();
     }
 
     public void randomizeElectionTimeout()
     {
-        electionTimeoutMilis = (Math.abs(randomizer.nextLong())
+        this.electionTimeoutMilis = (Math.abs(randomizer.nextLong())
                 % (electionTimeoutBounds[1] - electionTimeoutBounds[0]))
                 + electionTimeoutBounds[0];
+    }
+
+    public void randomizeHeartbeatTimeout()
+    {
+        this.heartbeatTimeoutMilis = (Math.abs(randomizer.nextLong())
+                % (heartbeatTimeoutBounds[1] - heartbeatTimeoutBounds[0]))
+                + heartbeatTimeoutBounds[0];
+    }
+
+    public void forceHeartbeat()
+    {
+        heartbeatTimeoutStartMoment = System.currentTimeMillis() - heartbeatTimeoutMilis;
     }
 }

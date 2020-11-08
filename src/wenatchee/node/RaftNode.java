@@ -15,7 +15,6 @@ package wenatchee.node; /**
 
 import wenatchee.exceptions.IdentityUnknownException;
 import wenatchee.networking.Identity;
-import wenatchee.networking.StreamConnectionManager;
 import wenatchee.protocol.Draft;
 import wenatchee.protocol.RaftEntry;
 
@@ -90,7 +89,7 @@ public class RaftNode
     BlockingQueue<RaftEntry> log;
 
     ExecutorService executorService;
-    StreamConnectionManager streamConnectionManager;
+    //StreamConnectionManager streamConnectionManager;
     Identity identity;
     Identity[] peers;
     MetaCollector metaCollector;
@@ -137,14 +136,14 @@ public class RaftNode
 
         this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath, configId);
-        streamConnectionManager = new StreamConnectionManager(
-                this.peers, this.identity, port, DEFAULT_BUFFER_SIZE, receivedDrafts, this.logger
-        );
+//        streamConnectionManager = new StreamConnectionManager(
+//                this.peers, this.identity, port, DEFAULT_BUFFER_SIZE, receivedDrafts, this.logger
+//        );
 
         //streamConnectionManager.getInfo();
 
         this.id = this.identity.getId();
-        this.clock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
+        this.clock = new NodeClock();
         this.logger.info(this.id + ": [SET-UP] RaftNode was built, id: " + this.id);
     }
 
@@ -181,19 +180,19 @@ public class RaftNode
                     Draft draft = receivedDrafts.poll();
                     if(metaCollector != null)
                     {
-                        metaCollector.markDraftReceived(draft.getTerm());
+                        metaCollector.markDraftReceived(draft.getNodeTerm());
                         metaCollector.tickMeanValue(draft.getSize());
                     }
 
-                    if(draft.getTerm() < getNodeTerm())
+                    if(draft.getNodeTerm() < getNodeTerm())
                     {
                         continue;
                     }
                     else
                     {
-                        if(draft.getTerm() > getNodeTerm())
+                        if(draft.getNodeTerm() > getNodeTerm())
                         {
-                            setNodeTerm(draft.getTerm());
+                            setNodeTerm(draft.getNodeTerm());
                         }
                     }
 
@@ -207,7 +206,7 @@ public class RaftNode
                     }
                     else if(draft.isVoteRequest())
                     {
-                        if(draft.getKnownDraftNumber() == knownDraftNumber && draft.getKnownTerm() == nodeTerm + 1)
+                        if(draft.getKnownDraftNumberLEGACY() == knownDraftNumber && draft.getKnownTermLEGACY() == nodeTerm + 1)
                         {
                             grantVote(draft.getLeaderID());
                         }
@@ -278,7 +277,7 @@ public class RaftNode
 
     public void runStreamConnectionManager()
     {
-        streamConnectionManager.run();
+        //streamConnectionManager.run();
     }
 
     public BlockingQueue<Draft> getReceivedDrafts()
@@ -349,7 +348,7 @@ public class RaftNode
         startedElection = true;
         knownLeaderId = -1;
         nodeTerm++;
-        streamConnectionManager.sendToAll(draftNewElection());
+        //streamConnectionManager.sendToAll(draftNewElection());
         this.logger.info(this.id + ": Sent to all: new election request");
     }
 
@@ -517,7 +516,7 @@ public class RaftNode
         nodeTerm++;
         votedFor[0] = nodeTerm;
         votedFor[1] = leaderId;
-        streamConnectionManager.sendToId(draftGrantVote(leaderId), leaderId);
+        //streamConnectionManager.sendToId(draftGrantVote(leaderId), leaderId);
     }
 
     private Draft draftGrantVote(byte proposedLeaderId)
@@ -536,9 +535,9 @@ public class RaftNode
 
     private void processVoteForCandidate(Draft draft)
     {
-        if(startedElection && draft.getTerm() == nodeTerm)
+        if(startedElection && draft.getNodeTerm() == nodeTerm)
         {
-            this.logger.info(this.id + ": Received a vote for term " + draft.getTerm() + " from node of id: " + draft.getAuthorId());
+            this.logger.info(this.id + ": Received a vote for term " + draft.getNodeTerm() + " from node of id: " + draft.getAuthorId());
             votesReceived.put(draft.getAuthorId(), true);
         }
         if(hasMajorityVotes())
@@ -552,7 +551,7 @@ public class RaftNode
     {
         role = Role.LEADER;
         this.logger.info(this.id + ": Role switched to LEADER");
-        streamConnectionManager.sendToAll(draftEmptyHeartbeat());
+        //streamConnectionManager.sendToAll(draftEmptyHeartbeat());
         this.logger.info(this.id + ": Sent first heartbeat after acquiring leadership.");
     }
 

@@ -11,10 +11,9 @@ class NodeClockTest
         System.out.println("Election timeout bounds: " + RaftNode.ELECTION_TIMEOUT_BOUNDS[0] + ", " + RaftNode.ELECTION_TIMEOUT_BOUNDS[1]);
 
         System.out.println("Creating new clock");
-        NodeClock nodeClock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
+        NodeClock nodeClock = new NodeClock();
         System.out.println("Current running time nano: " + nodeClock.getRunningTime());
         System.out.println("Current running time nano: " + nodeClock.getRunningTime());
-        System.out.println("Current running time milis: " + nodeClock.getRunningTimeMilis());
         System.out.println("Time to election timeout milis: " + nodeClock.getTimeToElectionTimeoutMilis());
 
         System.out.println("Sleeping 20 milliseconds");
@@ -47,7 +46,7 @@ class NodeClockTest
     @Test
     void testRandomElectionTime()
     {
-        NodeClock nodeClock = new NodeClock(RaftNode.ELECTION_TIMEOUT_BOUNDS, RaftNode.HEARTBEAT_TIMEOUT);
+        NodeClock nodeClock = new NodeClock();
         for(int i = 0; i < 1000; i++)
         {
             nodeClock.randomizeElectionTimeout();

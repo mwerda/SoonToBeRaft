@@ -1,4 +1,4 @@
-package wenatchee.networking;
+package obsolete;
 
 public class StreamNetwork
 {

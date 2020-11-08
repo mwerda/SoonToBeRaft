@@ -47,7 +47,9 @@ public class Draft implements Serializable
         HEARTBEAT((byte) 1),
         VOTE_FOR_CANDIDATE((byte) 2),
         REQUEST_VOTE((byte) 3),
-        REFUSE_VOTE((byte) 4);
+        VOTE_FALSE((byte) 4),
+        FALSE((byte) 5),
+        ACK((byte) 6);
 
         public byte value;
 
@@ -78,14 +80,14 @@ public class Draft implements Serializable
     private byte authorId;
     private DraftType draftType;
     private byte leaderID;
-    private int term;
-    private int draftNumber;
-    private int knownTerm;
-    private int knownDraftNumber;
+    private int nodeTerm;
+    private int nodeDraftNumber;
+    private int knownTermLEGACY;
+    private int knownDraftNumberLEGACY;
     private RaftEntry[] raftEntries;
     private int entriesCount;
 
-    public Draft(DraftType draftType, byte authorId, byte leaderID, int term, int draftNumber, int knownTerm, int knownDraftNumber, RaftEntry[] raftEntries)
+    public Draft(DraftType draftType, byte authorId, byte leaderID, int term, int nodeDraftNumber, int knownTermLEGACY, int knownDraftNumberLEGACY, RaftEntry[] raftEntries)
     {
         int aggregatedEntriesSize = 0;
         for(RaftEntry entry : raftEntries)
@@ -106,11 +108,11 @@ public class Draft implements Serializable
 
         this.draftType = draftType;
         this.authorId = authorId;
-        this.term = term;
+        this.nodeTerm = term;
         this.leaderID = leaderID;
-        this.draftNumber = draftNumber;
-        this.knownTerm = knownTerm;
-        this.knownDraftNumber = knownDraftNumber;
+        this.nodeDraftNumber = nodeDraftNumber;
+        this.knownTermLEGACY = knownTermLEGACY;
+        this.knownDraftNumberLEGACY = knownDraftNumberLEGACY;
         this.raftEntries = raftEntries;
         this.entriesCount = raftEntries.length;
     }
@@ -161,10 +163,10 @@ public class Draft implements Serializable
                 .putInt(size)
                 .put(draftType.getValue())
                 .put(leaderID)
-                .putInt(term)
-                .putInt(draftNumber)
-                .putInt(knownTerm)
-                .putInt(knownDraftNumber)
+                .putInt(nodeTerm)
+                .putInt(nodeDraftNumber)
+                .putInt(knownTermLEGACY)
+                .putInt(knownDraftNumberLEGACY)
                 .putInt(entriesCount);
 
         for(RaftEntry entry : raftEntries)
@@ -180,11 +182,11 @@ public class Draft implements Serializable
         boolean shallowEquivalence =
             this.size == comparedDraft.size
             && this.draftType == comparedDraft.draftType
-            && this.term == comparedDraft.term
+            && this.nodeTerm == comparedDraft.nodeTerm
             && this.leaderID == comparedDraft.leaderID
-            && this.draftNumber == comparedDraft.draftNumber
-            && this.knownTerm == comparedDraft.knownTerm
-            && this.knownDraftNumber == comparedDraft.knownDraftNumber
+            && this.nodeDraftNumber == comparedDraft.nodeDraftNumber
+            && this.knownTermLEGACY == comparedDraft.knownTermLEGACY
+            && this.knownDraftNumberLEGACY == comparedDraft.knownDraftNumberLEGACY
             && this.entriesCount == comparedDraft.entriesCount;
 
         if(!shallowEquivalence)
@@ -198,14 +200,19 @@ public class Draft implements Serializable
         return true;
     }
 
+    public int getEntriesCount()
+    {
+        return this.entriesCount;
+    }
+
     public DraftType getType()
     {
         return draftType;
     }
 
-    public int getTerm()
+    public int getNodeTerm()
     {
-        return term;
+        return nodeTerm;
     }
 
     public int getSize()
@@ -233,14 +240,19 @@ public class Draft implements Serializable
         return authorId;
     }
 
-    public int getKnownDraftNumber()
+    public int getNodeDraftNumber()
     {
-        return knownDraftNumber;
+        return nodeDraftNumber;
     }
 
-    public int getKnownTerm()
+    public int getKnownDraftNumberLEGACY()
     {
-        return knownTerm;
+        return knownDraftNumberLEGACY;
+    }
+
+    public int getKnownTermLEGACY()
+    {
+        return knownTermLEGACY;
     }
 
     public byte getLeaderID()

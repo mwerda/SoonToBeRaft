@@ -13,7 +13,7 @@ public class NodeSetupTest
         node2.startNode();
 
         RaftNodeLight[] nodeTable = {node0.raftNodeLight, node1.raftNodeLight, node2.raftNodeLight};
-        NodeMetrics m = new NodeMetrics(nodeTable);
+        //NodeMetrics m = new NodeMetrics(nodeTable);
 
         Thread.sleep(10000000);
     }

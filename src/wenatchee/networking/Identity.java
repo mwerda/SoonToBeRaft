@@ -1,6 +1,7 @@
 package wenatchee.networking;
 
 import wenatchee.logging.Lg;
+import wenatchee.protocol.Draft;
 
 public class Identity
 {
@@ -10,6 +11,9 @@ public class Identity
     byte id;
     int listeningPort;
     String remoteAddress;
+
+    int termNumber;
+    int draftNumber;
 
     public Identity(String ipAddress, int listeningPort, byte id)
     {
@@ -30,6 +34,9 @@ public class Identity
         this.listeningPort = anotherIdentity.listeningPort;
         this.id = anotherIdentity.id;
         this.remoteAddress = anotherIdentity.remoteAddress;
+
+        this.termNumber = -1;
+        this.draftNumber = -1;
     }
 
     public String getIpAddress()
@@ -43,4 +50,10 @@ public class Identity
     }
 
     public String getRemoteAddress() { return this.remoteAddress; }
+
+    public void updateTermAndDraft(Draft draft)
+    {
+        this.termNumber = draft.getNodeTerm();
+        this.draftNumber = draft.getNodeDraftNumber();
+    }
 }
