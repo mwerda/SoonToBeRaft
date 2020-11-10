@@ -9,6 +9,7 @@ import java.rmi.RemoteException;
 
 public class Node
 {
+
     String module;
 
     int configId;
@@ -70,3 +71,4 @@ public class Node
         this.raftNodeLight.runNode();
     }
 }
+

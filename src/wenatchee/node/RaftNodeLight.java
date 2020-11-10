@@ -1061,10 +1061,15 @@ class ErrorInjectionAndMetricsModule
     }
 }
 
+
+
 // NO VOTES WILL COME FROM LAGGING NODES
 // Otherwise, they would have to discard catch-up entries to bump up current term
 class VotingModule
 {
+
+
+
     String module = "VotingModule";
 
     //int[] votes;
