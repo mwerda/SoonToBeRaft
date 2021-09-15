@@ -95,11 +95,12 @@ public class RaftNodeLight
         LISTENER
     }
 
+    //public BlockingQueue<NodeEvent> nodeEvents;
+
     static String module = "RaftNodeLight";
 
     public final static long[] ELECTION_TIMEOUT_BOUNDS = {3000, 4000};//{150, 300};
     //public final static int HEARTBEAT_TIMEOUT = 500;
-    final static int CLOCK_SLEEP_TIME_MILIS = 1;
     //final static int DEFAULT_BUFFER_SIZE = 8192;
     final static int DEFAULT_HEARTBEAT_TIMEOUT = 200;
     //final static int DEFAULT_CATCHUP_TIMEOUT = 50;
@@ -282,58 +283,60 @@ public class RaftNodeLight
 
         if(this.mode != Mode.LISTENER)
         {
-            executorService.execute(() ->
-            {
-                Lg.l.appendToHashMap("Clock", "RaftNodeLight");
-                this.clock.resetElectionTimeoutStartMoment();
-                this.clock.resetHeartbeatTimeoutStartMoment();
-
-                Lg.l.info(module, " [Thread] Clock thread started");
-                Thread.currentThread().setName("Clock");
-                while(true)
-                {
-                    if(clock.heartbeatTimeouted())
-                    {
-                        this.sendHeartbeat();
-                    }
-
-                    if(clock.electionTimeouted())
-                    {
-                        startNewElections();
-                    }
-
-//                    if(role == Role.LEADER && clock.heartbeatTimeouted())
-//                    {
-//                        // TODO
-//                        // handleHeartbeatTimeout()
-//                        clock.resetHeartbeatTimeoutStartMoment();
-//                    }
-
-                    try
-                    {
-                        Thread.sleep(CLOCK_SLEEP_TIME_MILIS);
-                    }
-                    catch (InterruptedException e)
-                    {
-                        e.printStackTrace();
-                    }
-
-                    if(this.slowdown)
-                    {
-                        Lg.l.info("Clock", "Starting clock loop " +
-                                " Clock loops: " + this.em.clockThreadSpins);
-                        try {
-                            Thread.sleep(this.em.threadLoopSlowdown);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        this.em.clockThreadSpins += 1;
-                    }
-                }
-            });
+            this.spinClock();
         }
         else
+        {
             Lg.l.info(module, " [Thread] Clock suspended from running, Node in LISTENER mode");
+        }
+//            executorService.execute(() ->
+//            {
+//                //<B>
+//                Lg.l.appendToHashMap("Clock", "RaftNodeLight");
+//                this.clock.resetElectionTimeoutStartMoment();
+//                this.clock.resetHeartbeatTimeoutStartMoment();
+//
+//                Lg.l.info(module, " [Thread] Clock thread started");
+//                Thread.currentThread().setName("Clock");
+//                while(true)
+//                {
+//                    if(clock.electionTimeouted())
+//                    {
+//                        startNewElections();
+//                    }
+//
+////                    if(role == Role.LEADER && clock.heartbeatTimeouted())
+////                    {
+////                        // TODO
+////                        // handleHeartbeatTimeout()
+////                        clock.resetHeartbeatTimeoutStartMoment();
+////                    }
+//
+//                    try
+//                    {
+//                        Thread.sleep(CLOCK_SLEEP_TIME_MILIS);
+//                    }
+//                    catch (InterruptedException e)
+//                    {
+//                        e.printStackTrace();
+//                    }
+//
+//                    if(this.slowdown)
+//                    {
+//                        Lg.l.info("Clock", "Starting clock loop " +
+//                                " Clock loops: " + this.em.clockThreadSpins);
+//                        try {
+//                            Thread.sleep(this.em.threadLoopSlowdown);
+//                        } catch (InterruptedException e) {
+//                            e.printStackTrace();
+//                        }
+//                        this.em.clockThreadSpins += 1;
+//                    }
+//                }
+//            });
+//        }
+//        else
+//            Lg.l.info(module, " [Thread] Clock suspended from running, Node in LISTENER mode");
 
 
 
@@ -357,6 +360,44 @@ public class RaftNodeLight
 //            runStreamConnectionManager();
 //        });
 
+    }
+
+    private void spinClock()
+    {
+        this.executorService.execute(() ->
+        {
+            this.clock.resetTimeouts();
+            Lg.l.info(module, " [Thread] Clock thread started");
+            Thread.currentThread().setName("Clock");
+            while(true)
+            {
+                if(clock.electionTimeouted())
+                {
+                    startNewElections();
+                }
+                try
+                {
+                    Thread.sleep(NodeClock.CLOCK_SLEEP_TIME_MILIS);
+                }
+                catch (InterruptedException e)
+                {
+                    e.printStackTrace();
+                    Lg.l.severe("NodeClock", "Fail on clock sleep");
+                }
+
+                if(this.slowdown)
+                {
+                    Lg.l.info("Clock", "Starting clock loop " +
+                            " Clock loops: " + this.em.clockThreadSpins);
+                    try {
+                        Thread.sleep(this.em.threadLoopSlowdown);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    this.em.clockThreadSpins += 1;
+                }
+            }
+        });
     }
 
     private void sendHeartbeat()
@@ -931,8 +972,9 @@ public class RaftNodeLight
     {
         Lg.l.info(module, " Acquired leadership.  Node switching to LEADER state.");
 
-        clock.resetElectionTimeoutStartMoment();
-
+        //<B>
+        //clock.resetElectionTimeoutStartMoment();
+        //<J>
 
         int myId = this.id;
         atomicStateChange(new HashMap<String, Integer>()
