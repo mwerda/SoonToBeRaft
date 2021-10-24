@@ -69,10 +69,8 @@ public class RaftNodeLight
     public void presentNodeState() {
         System.out.println("heartbeatTimeout: " + this.heartbeatTimeout);
         System.out.println("nodeTerm: " + this.nodeTerm);
-        System.out.println("draftNumber: " + this.draftNumber);
-        System.out.println("knownLeaderId: " + this.knownLeaderId);
-        System.out.println("knownTerm: " + this.knownTerm);
-        //System.out.println("lastCommittedDraft: " + this.lastCommittedDraft);
+        System.out.println("nodeDraftNumber: " + this.nodeDraft);
+        System.out.println("leaderID: " + this.leaderID);
         System.out.println("startedElection: " + this.startedElection);
         System.out.println("votedFor: " + this.votedFor);
         System.out.println("role: " + this.role);
@@ -142,17 +140,15 @@ public class RaftNodeLight
     int nodesInCluster;
     private boolean freshLeader;
 
-    byte knownLeaderId;
-    int knownTerm;
-    int lastCommittedDraft;
+    byte leaderId;
     boolean startedElection;
     int[] votedFor;
 
     long nodeStartTime;
     long lastEventTime;
 
-    VotingModule votingModule;
-    ErrorInjectionAndMetricsModule em;
+    //VotingModule votingModule;
+    //ErrorInjectionAndMetricsModule em;
 
     Role role;
     NodeClock clock;
@@ -204,9 +200,7 @@ public class RaftNodeLight
         this.heartbeatTimeout = heartbeatTimeout;
         this.nodeTerm = 0;
         this.draftNumber = 0;
-        this.knownLeaderId = -1;
-        this.knownTerm = -1;
-        this.lastCommittedDraft = -1;
+        this.leaderId = -1;
         this.startedElection = false;
         this.votedFor = new int[]{-1, -1, -1};
         this.role = Role.FOLLOWER;
@@ -221,8 +215,6 @@ public class RaftNodeLight
 
         //this.votesReceived = new HashMap<>();
         discoverClusterIdentities(configFilePath, configId);
-
-        this.votingModule = new VotingModule(this.peers.length + 1, (int)this.id);
 
         this.clock = new NodeClock();
         this.nodeEvents = new ArrayList<>();
@@ -267,18 +259,6 @@ public class RaftNodeLight
             Thread.currentThread().setName("ReceiverN" + this.id);
             while(true)
             {
-                if(this.slowdown)
-                {
-                    Lg.l.info("Receiver", "Starting receiver loop. receivedDrafts count: " +
-                            this.receivedDrafts.size() + " Receiver loops: " + this.em.consumerThreadSpins);
-                    try {
-                        Thread.sleep(this.em.threadLoopSlowdown);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    this.em.receiverThreadSpins += 1;
-                }
-
                 if(!receivedDrafts.isEmpty())
                 {
                     processDraftMessage(receivedDrafts.poll());
@@ -541,7 +521,8 @@ public class RaftNodeLight
 
     void processDraftMessage(Draft draft)
     {
-        // end of communication cases
+        // First, reset the clock
+
         if(draft.getNodeTerm() < this.nodeTerm)
         {
             // drop the message
@@ -552,24 +533,11 @@ public class RaftNodeLight
         if(draft.getNodeTerm() > this.nodeTerm)
         {
             int currentTerm = this.nodeTerm;
-            int knownLeaderId = draft.getLeaderID();
+            int leaderId = draft.getLeaderID();
             //step down
-            HashMap<String, Integer> atomicMap = new HashMap<String, Integer>()
-            {{
-                put("addTerm", draft.getNodeTerm() - currentTerm);
-                put("setRole", 0);
-                put("setLeaderId", knownLeaderId);
-            }};
+
+
             String context = "Bumping up current term as incoming Draft knows higher term.";
-//            int draftDifference = draft.getNodeDraftNumber() - this.draftNumber;
-            // This is leader's responsibility
-//            if(draftDifference > 1 && draft.getAuthorId() == draft.getLeaderID())
-//            {
-//                atomicMap.put("setCatchupStart", this.draftNumber);
-//                context += " Known Draft number is also higher - starting catchup mechanism.";
-//                atomicMap.put("resetVotingModule", 1);
-//            }
-            atomicStateChange(atomicMap);
         }
 
         if(draft.getType() == Draft.DraftType.VOTE_FALSE || draft.getType() == Draft.DraftType.VOTE_FOR_CANDIDATE)
@@ -581,32 +549,33 @@ public class RaftNodeLight
         if(draft.getType() == Draft.DraftType.HEARTBEAT)
         {
             processHeartbeat(draft);
+            return;
         }
         if(draft.getType() == Draft.DraftType.REQUEST_VOTE)
         {
             processVoteRequest(draft);
             return;
         }
-        if(draft.getType() == Draft.DraftType.ACK && this.role == Role.LEADER)
-        {
-            Identity peer = findPeerOfId(draft.getAuthorId());
-            peer.updateTermAndDraft(draft);
-            this.catchup(peer);
-        }
+//        if(draft.getType() == Draft.DraftType.ACK && this.role == Role.LEADER)
+//        {
+//            Identity peer = findPeerOfId(draft.getAuthorId());
+//            peer.updateTermAndDraft(draft);
+//            this.catchup(peer);
+//        }
     }
 
     private void processHeartbeat(Draft draft)
     {
-        if(this.knownLeaderId != draft.getLeaderID())
+        if(this.leaderId != draft.getLeaderID())
         {
-            setKnownLeaderId(draft.getLeaderID());
+            setleaderId(draft.getLeaderID());
         }
 
         if(draft.getEntriesCount() > 0)
         {
             this.processEntries(draft);
 
-            this.sendDraft(draftAck(), this.knownLeaderId);
+            this.sendDraft(draftAck(), this.leaderId);
         }
     }
 
@@ -632,6 +601,7 @@ public class RaftNodeLight
         return null;
     }
 
+    // TODO ATOMIC ACCESS TO MEMORY
     void startNewElections()
     {
         Lg.l.info(module, " Election timeout reached: starting new election");
@@ -686,7 +656,7 @@ public class RaftNodeLight
 
         if(changedValues.get("setLeaderId") != null)
         {
-            this.knownLeaderId = changedValues.get("setLeaderId").byteValue();
+            this.leaderId = changedValues.get("setLeaderId").byteValue();
             Lg.l.info(module, "atomic setLeaderId: " + changedValues.get("setLeaderId").byteValue());
         }
         if(changedValues.get("setRole") != null)
@@ -731,7 +701,7 @@ public class RaftNodeLight
 //atomicMap.put("resetVotingModule", 1);
     }
 
-    private void setKnownLeaderId(int id)
+    private void setleaderId(int id)
     {
         HashMap<String, Integer> map = new HashMap<>()
         {{
@@ -858,7 +828,7 @@ public class RaftNodeLight
 //        return new Draft(
 //                Draft.DraftType.HEARTBEAT,
 //                id,
-//                knownLeaderId,
+//                leaderId,
 //                nodeTerm,
 //                draftNumber,
 //                knownTerm,
@@ -904,7 +874,7 @@ public class RaftNodeLight
         return new Draft(
                 Draft.DraftType.ACK,
                 (byte)this.id,
-                this.knownLeaderId,
+                this.leaderId,
                 this.nodeTerm,
                 this.draftNumber,
                 this.knownTerm,
@@ -925,7 +895,7 @@ public class RaftNodeLight
         return new Draft(
                 Draft.DraftType.VOTE_FOR_CANDIDATE,
                 (byte)id,
-                knownLeaderId,
+                leaderId,
                 nodeTerm,
                 draftNumber,
                 knownTerm,
@@ -938,7 +908,7 @@ public class RaftNodeLight
         return new Draft(
                 Draft.DraftType.FALSE,
                 (byte)id,
-                knownLeaderId,
+                leaderId,
                 nodeTerm,
                 draftNumber,
                 knownTerm,
@@ -1059,6 +1029,23 @@ public class RaftNodeLight
     {
         Draft reply;
         // TODO numer wiadomosci ostatniej zacommitowanej
+        if(this.nodeTerm < incomingDraft.getNodeTerm() && this.lastCommittedDraft <= incomingDraft.getNodeDraftNumber())
+        {
+            this.myVoteId = id;
+            this.myVoteTerm = term;
+            if(id == this.myId)
+            {
+                this.addVote(new Draft(
+                        Draft.DraftType.VOTE_FOR_CANDIDATE,
+                        (byte)this.myId,
+                        (byte) -1,
+                        this.myRequestTerm,
+                        this.myRequestDraft,
+                        -1,
+                        -1,
+                        new RaftEntry[0]
+                ));
+            }
         if(this.votingModule.tryGrantVote(incomingDraft.getNodeTerm(), incomingDraft.getNodeDraftNumber(), incomingDraft.getAuthorId()))
         {
             reply = draftGrantVote();
@@ -1221,6 +1208,7 @@ class VotingModule
     {
 
         //todo check this condition
+        //
         if(this.myVoteTerm < term && this.lastKnownDraft <= lastCommitedDraft)
         {
             this.myVoteId = id;

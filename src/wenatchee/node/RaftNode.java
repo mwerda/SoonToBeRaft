@@ -71,7 +71,7 @@ public class RaftNode
     int draftNumber;
     int nodesInCluster;
 
-    byte knownLeaderId;
+    byte leaderId;
     int knownTerm;
     int knownDraftNumber;
     boolean startedElection;
@@ -118,7 +118,7 @@ public class RaftNode
         this.heartbeatTimeout = heartbeatTimeout;
         this.nodeTerm = 0;
         this.draftNumber = 0;
-        this.knownLeaderId = -1;
+        this.leaderId = -1;
         this.knownTerm = -1;
         this.knownDraftNumber = -1;
         //hardcoded for 2 nodes TODO move to config file handler
@@ -346,7 +346,7 @@ public class RaftNode
         this.logger.info(this.id + ": Node switched to CANDIDATE state");
 
         startedElection = true;
-        knownLeaderId = -1;
+        leaderId = -1;
         nodeTerm++;
         //streamConnectionManager.sendToAll(draftNewElection());
         this.logger.info(this.id + ": Sent to all: new election request");
@@ -470,7 +470,7 @@ public class RaftNode
         return new Draft(
                 Draft.DraftType.HEARTBEAT,
                 id,
-                knownLeaderId,
+                leaderId,
                 nodeTerm,
                 draftNumber,
                 knownTerm,
@@ -502,7 +502,7 @@ public class RaftNode
         return new Draft(
                 Draft.DraftType.REQUEST_VOTE,
                 id,
-                knownLeaderId,
+                leaderId,
                 nodeTerm,
                 draftNumber,
                 knownTerm,

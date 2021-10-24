@@ -8,6 +8,8 @@ import java.util.HashMap;
 
 import wenatchee.node.Node;
 import wenatchee.node.RaftNodeLight;
+import wenatchee.protocol.Draft;
+import wenatchee.protocol.RaftEntry;
 
 public class RaftNodeTest
 {
@@ -50,7 +52,7 @@ public class RaftNodeTest
         RaftNodeLight node0 = new Node(0, 5001, 6100, false).raftNodeLight;
 
         // Assertions - initial state is expected to be zeroed
-        Assertions.assertTrue(node0.knownLeaderId == -1);
+        Assertions.assertTrue(node0.leaderId == -1);
         Assertions.assertTrue(node0.role == RaftNodeLight.Role.FOLLOWER);
         Assertions.assertTrue(node0.getNodeTerm() == 0);
 
@@ -65,7 +67,38 @@ public class RaftNodeTest
         }});
 
         node0.presentNodeState();
-        Assertions.assertTrue(node0.knownLeaderId == -1);
+        Assertions.assertTrue(node0.leaderId == -1);
+        Assertions.assertTrue(node0.role == RaftNodeLight.Role.CANDIDATE);
+        Assertions.assertTrue(node0.getNodeTerm() == 1);
+    }
+
+    @Test
+    public void testIsolatedReceiveVoteRequest () throws InterruptedException {
+        RaftNodeLight node0 = new Node(0, 5001, 6100, false).raftNodeLight;
+
+        // Assertions - initial state is expected to be zeroed
+        Assertions.assertTrue(node0.leaderId == -1);
+        Assertions.assertTrue(node0.role == RaftNodeLight.Role.FOLLOWER);
+        Assertions.assertTrue(node0.getNodeTerm() == 0);
+
+        node0.presentNodeState();
+
+        // Simulate the situation where node receives REQUEST_VOTE request. Node should change its state and grant a vote
+        node0.receivedDrafts.add(
+                new Draft(
+                    Draft.DraftType.REQUEST_VOTE,
+                    (byte) 1,
+                    (byte) -1,
+                    1,
+                    1,
+                    0,
+                    0,
+                    new RaftEntry[0])
+        );
+        node0.processDraftMessage(node0.receivedDrafts.poll());
+
+
+        Assertions.assertTrue(node0.leaderId == -1);
         Assertions.assertTrue(node0.role == RaftNodeLight.Role.CANDIDATE);
         Assertions.assertTrue(node0.getNodeTerm() == 1);
     }
