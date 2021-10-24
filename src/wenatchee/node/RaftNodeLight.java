@@ -2,7 +2,7 @@ package wenatchee.node; /**
  * RaftNode represents a single node in cluster. It orchestrates four distinct threads:
  * 1. Clock, responsible for signalling timeouts on election and heartbeat and measuring elapsed time
  * It checks for timeouts every CLOCK_SLEEP_TIME, by default 1 ms
- * 2. Receiver, doing his job by listening to incoming Drafts, rebuilding them and passing to receivedDrafts
+ * 2. Receiver, doing its job by listening to incoming Drafts, rebuilding them and passing to receivedDrafts
  * 3. Consumer, deciding on how to process incoming Drafts
  * 4. Sender, polling Drafts from outgoingDrafts and sending them to other nodes
  */
@@ -34,7 +34,20 @@ import java.util.concurrent.*;
 
 public class RaftNodeLight
 {
-    static ArrayList<RaftNodeLight> nodes = new ArrayList<>();
+    class NodeEvent
+    {
+        String message;
+        long fromNodeStart;
+        long fromLastEvent;
+
+        public NodeEvent(String message, long fromNodeStart, long fromLastEvent)
+        {
+            this.message = message;
+            //this.source = source;
+            this.fromNodeStart = fromNodeStart;
+            this.fromLastEvent = fromLastEvent;
+        }
+    }
 
     static void presentMetaCounters()
     {
@@ -51,6 +64,19 @@ public class RaftNodeLight
         System.out.println();
         System.out.println();
         System.out.println("*************");
+    }
+
+    public void presentNodeState() {
+        System.out.println("heartbeatTimeout: " + this.heartbeatTimeout);
+        System.out.println("nodeTerm: " + this.nodeTerm);
+        System.out.println("draftNumber: " + this.draftNumber);
+        System.out.println("knownLeaderId: " + this.knownLeaderId);
+        System.out.println("knownTerm: " + this.knownTerm);
+        //System.out.println("lastCommittedDraft: " + this.lastCommittedDraft);
+        System.out.println("startedElection: " + this.startedElection);
+        System.out.println("votedFor: " + this.votedFor);
+        System.out.println("role: " + this.role);
+
     }
 
     private void presentMeta()
@@ -122,6 +148,9 @@ public class RaftNodeLight
     boolean startedElection;
     int[] votedFor;
 
+    long nodeStartTime;
+    long lastEventTime;
+
     VotingModule votingModule;
     ErrorInjectionAndMetricsModule em;
 
@@ -141,6 +170,10 @@ public class RaftNodeLight
     Identity identity;
     Identity[] peers;
     MetaCollector metaCollector;
+
+    public ArrayList<NodeEvent> nodeEvents;
+
+    static ArrayList<RaftNodeLight> nodes = new ArrayList<>();
 
     public RaftNodeLight(int configId) throws IOException
     {
@@ -192,14 +225,31 @@ public class RaftNodeLight
         this.votingModule = new VotingModule(this.peers.length + 1, (int)this.id);
 
         this.clock = new NodeClock();
+        this.nodeEvents = new ArrayList<>();
+        this.nodeStartTime = System.currentTimeMillis();
+        this.lastEventTime = System.currentTimeMillis();
+
+        this.addEvent("Node was initialized");
 
         Lg.l.info(RaftNodeLight.module, " [SET-UP] RaftNodeLight was built, id: " + this.id);
     }
 
 
+    public void addEvent(String message) {
+        long currentTime = System.currentTimeMillis();
+        long previousEvent = this.lastEventTime;
+        this.lastEventTime = currentTime;
 
+        long fromNodeStart = currentTime - this.nodeStartTime;
+        long fromPreviousEvent = this.lastEventTime - previousEvent;
+
+        this.nodeEvents.add(new NodeEvent(message, fromNodeStart, fromPreviousEvent));
+    }
 
     public void runNode()
+    /**
+     * Default builder - uses FULL_NODE mode
+     */
     {
         runNode(Mode.FULL_NODE);
     }
@@ -212,8 +262,9 @@ public class RaftNodeLight
 
         executorService.execute(() ->
         {
+            this.addEvent("Inside runNode: Starting receiver thread");
             Lg.l.info(RaftNodeLight.module, " [Thread] Receiver thread started");
-            Thread.currentThread().setName("Receiver");
+            Thread.currentThread().setName("ReceiverN" + this.id);
             while(true)
             {
                 if(this.slowdown)
@@ -342,7 +393,8 @@ public class RaftNodeLight
 
         executorService.execute(() ->
         {
-            Thread.currentThread().setName("Sender");
+            addEvent("Starting an sender thread");
+            Thread.currentThread().setName("SenderN" + this.id);
             try
             {
                 Draft draft = outgoingDrafts.take();
@@ -363,9 +415,13 @@ public class RaftNodeLight
     }
 
     private void spinClock()
+    /**
+     * Once-run function to initialize NodeClock.
+     */
     {
         this.executorService.execute(() ->
         {
+            this.addEvent("Starting a clock thread");
             this.clock.resetTimeouts();
             Lg.l.info(module, " [Thread] Clock thread started");
             Thread.currentThread().setName("Clock");
@@ -590,8 +646,12 @@ public class RaftNodeLight
             //put("addDraftCount", 1);
             put("askedForVotes", 1);
         }});
+
+        addEvent("Starting new election due to election timeout reached");
         this.votingModule.startElectionsForMe(this.nodeTerm, this.draftNumber, this.id);
         boolean selfVote = this.votingModule.tryGrantVote(this.nodeTerm, this.draftNumber, this.id);
+
+        addEvent("Requesting votes for leader from other nodes in a ring");
         remoteRequestVotes();
         Lg.l.info(RaftNodeLight.module, " Sent to all: new election request");
     }
@@ -606,8 +666,12 @@ public class RaftNodeLight
 //    "finishedElections"
     // To make sure there is no conflict of interest between threads modifying state of node
     //put"freshLeader", 1
-    private synchronized void atomicStateChange(HashMap<String, Integer> changedValues)
+    public synchronized void atomicStateChange(HashMap<String, Integer> changedValues)
     {
+        /**
+         * Function used to atomically change the state of a node. This guarantees
+         */
+        addEvent("Changing node state");
         Lg.l.appendToHashMap("atomicStateChange", "RaftNodeLight");
         if(this.slowdown)
         {
@@ -955,6 +1019,7 @@ public class RaftNodeLight
 
     void processVote(Draft incomingDraft)
     {
+        addEvent("ProcessVote function called");
         if(incomingDraft.getNodeTerm() == votingModule.myVoteTerm)
         {
             this.votingModule.addVote(incomingDraft);
@@ -970,6 +1035,7 @@ public class RaftNodeLight
 
     private void acquireLeadership()
     {
+        addEvent("Acquiring leadership");
         Lg.l.info(module, " Acquired leadership.  Node switching to LEADER state.");
 
         //<B>

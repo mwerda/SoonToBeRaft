@@ -10,19 +10,6 @@ import java.util.concurrent.TimeUnit;
 
 public class NodeClock
 {
-    class ClockEvent
-    {
-        String message;
-        long fromNodeStart;
-        long fromLastEvent;
-
-        public ClockEvent(String message)
-        {
-            this.message = message;
-            this.fromNodeStart = System.currentTimeMillis() - NodeClock.this.startTime;
-            this.fromLastEvent = System.currentTimeMillis() - NodeClock.this.eventTimer;
-        }
-    }
 
     static int CLOCK_SLEEP_TIME_MILIS = 1;
 
@@ -42,12 +29,10 @@ public class NodeClock
     //private long[] electionTimeoutBounds;
     private Random randomizer;
 
-    ArrayList<ClockEvent> clockEvents;
 
     NodeClock()
     {
         this.startTime = System.currentTimeMillis();
-        this.clockEvents = new ArrayList<ClockEvent>();
         this.unboundTimer = startTime;
 
         this.randomizer = new Random();
@@ -55,7 +40,7 @@ public class NodeClock
         this.randomizeElectionTimeout();
         this.randomizeHeartbeatTimeout();
 
-        this.logClockEvent("ClockCreation");
+        //this.logClockEvent("ClockCreation");
     }
 
     public long getElectionTimeoutMilis()
@@ -90,9 +75,9 @@ public class NodeClock
 //        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - this.startTime);
 //    }
 
-    public void logClockEvent(String message)
+    public void logNodeEvent(String message)
     {
-        this.clockEvents.add(new ClockEvent(message));
+        //this.nodeEvents.add(new NodeEvent(message));
     }
 
     public long measureUnbound()
@@ -106,7 +91,7 @@ public class NodeClock
     {
         if(getTimeToElectionTimeoutMilis() < 0)
         {
-            this.logClockEvent("ElectionTimeout");
+            this.logNodeEvent("ElectionTimeout");
             return true;
         }
         else
@@ -119,7 +104,7 @@ public class NodeClock
     {
         if(getTimeToHeartbeatTimeoutMilis() < 0)
         {
-            this.logClockEvent("ElectionTimeout");
+            //this.logClockEvent("ElectionTimeout");
             return true;
         }
         else
@@ -131,13 +116,13 @@ public class NodeClock
     public void resetElectionTimeoutStartMoment()
     {
         electionTimeoutStartMoment = System.currentTimeMillis();
-        logClockEvent("Election timer reset");
+        //logClockEvent("Election timer reset");
     }
 
     public void resetHeartbeatTimeoutStartMoment()
     {
         heartbeatTimeoutStartMoment = System.currentTimeMillis();
-        logClockEvent("Heartbeat timer reset");
+        //logClockEvent("Heartbeat timer reset");
     }
 
     public void randomizeElectionTimeout()
@@ -156,14 +141,14 @@ public class NodeClock
 
     public void forceHeartbeat()
     {
-        this.logClockEvent("Force Heartbeat");
+        //this.logClockEvent("Force Heartbeat");
         heartbeatTimeoutStartMoment = System.currentTimeMillis() - heartbeatTimeoutMilis;
         this.resetTimeouts();
     }
 
     protected void resetTimeouts()
     {
-        logClockEvent("Reset both timeouts");
+        //logClockEvent("Reset both timeouts");
         this.resetHeartbeatTimeoutStartMoment();
         this.resetElectionTimeoutStartMoment();
     }

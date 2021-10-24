@@ -1,0 +1,5 @@
+RaftNodeTest:
+    @Test
+    public void test3Nodes () throws InterruptedException {
+
+    Runs 3 nodes; Properly passess a request vote type of message. Gets no reply though.

@@ -10,6 +10,8 @@ import java.rmi.RemoteException;
 public class Node
 {
 
+
+
     String module;
 
     int configId;
