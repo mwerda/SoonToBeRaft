@@ -165,7 +165,7 @@ public class RaftNodeTest {
             client1.deliverDraft("rmi://169.254.88.42:5101/", d);
             client2.deliverDraft("rmi://169.254.186.115:5102/", d);
             client0.deliverDraft("rmi://169.254.204.245:5100/", d);
-            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5102/", d);
 
 
             System.out.println("STRAIGHT AFTER DELIVERY NODE STATUS");
@@ -175,6 +175,11 @@ public class RaftNodeTest {
 
             System.out.println("10 SECONDS AFTER DELIVERY NODE STATUS");
             Thread.sleep(10000);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+
+
             node0.presentNodeState();
             node1.presentNodeState();
             node2.presentNodeState();

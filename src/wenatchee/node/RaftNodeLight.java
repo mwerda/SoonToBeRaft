@@ -996,7 +996,7 @@ public class RaftNodeLight
     public void enqueue(Draft draft)
     {
         RaftNodeLight.presentMetaCounters();
-        this.metaCollector.tickIncomingMessages((int)draft.getAuthorId());
+        //this.metaCollector.tickIncomingMessages((int)draft.getAuthorId());
         this.receivedDrafts.add(draft);
     }
 
