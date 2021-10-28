@@ -140,9 +140,10 @@ public class RaftNodeTest {
         RaftNodeLight node1 = new RaftNodeLight(200, 5101, "src/configuration", 1);
         RaftNodeLight node2 = new RaftNodeLight(200, 5102, "src/configuration", 2);
 
-        node0.runNode();
-        node1.runNode();
-        node2.runNode();
+// commenting out as this enables old code paths
+//        node0.runNode();
+//        node1.runNode();
+//        node2.runNode();
 
         RemoteServant servant0 = new RemoteServant(node0);
         RemoteServant servant1 = new RemoteServant(node1);
@@ -163,6 +164,9 @@ public class RaftNodeTest {
             client0.deliverDraft("rmi://169.254.204.245:5100/", d);
             client1.deliverDraft("rmi://169.254.88.42:5101/", d);
             client2.deliverDraft("rmi://169.254.186.115:5102/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+
 
             System.out.println("STRAIGHT AFTER DELIVERY NODE STATUS");
             node0.presentNodeState();
