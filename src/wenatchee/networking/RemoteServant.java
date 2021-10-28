@@ -8,11 +8,14 @@ import java.rmi.server.UnicastRemoteObject;
 
 public class RemoteServant extends UnicastRemoteObject implements MessengerService
 {
+    public long receivedDrafts = 0;
     static String module = "RemoteServant";
     RaftNodeLight node;
+
     public RemoteServant(RaftNodeLight node) throws RemoteException
     {
         super();
+        this.receivedDrafts = 0;
         Lg.l.appendToHashMap(module, "Node");
         this.node = node;
     }
@@ -27,6 +30,9 @@ public class RemoteServant extends UnicastRemoteObject implements MessengerServi
 //        return "from server " + clientMessage;
 //    }
 //
+
+
+
 //    public boolean appendEntries(Draft draft)
 //    {
 //        return node.appendEntries(draft);
@@ -51,6 +57,7 @@ public class RemoteServant extends UnicastRemoteObject implements MessengerServi
     {
         this.node.enqueue(draft);
         System.out.println(draft);
+        this.receivedDrafts += 1;
         //return draft;
     }
 }

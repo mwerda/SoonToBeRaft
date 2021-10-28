@@ -75,5 +75,6 @@ public class RemoteClient
         //System.out.println(service.sendMessage("Hey server " + service.getClass().getName()));
         //System.out.println(service2.deliverDraft(d));
         service.deliverDraft(draft);
+        System.out.println("Draft delivered lol");
     }
 }

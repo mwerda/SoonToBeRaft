@@ -16,6 +16,7 @@ package wenatchee.node; /**
 import wenatchee.exceptions.IdentityUnknownException;
 import wenatchee.logging.Lg;
 import wenatchee.networking.Identity;
+import wenatchee.networking.MessengerService;
 import wenatchee.networking.RemoteClient;
 import wenatchee.protocol.Draft;
 import wenatchee.protocol.RaftEntry;
@@ -27,6 +28,7 @@ import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.util.*;
@@ -67,6 +69,7 @@ public class RaftNodeLight
     }
 
     public void presentNodeState() {
+        System.out.println("***");
         System.out.println("heartbeatTimeout: " + this.heartbeatTimeout);
         System.out.println("nodeTerm: " + this.nodeTerm);
         System.out.println("draftNumber: " + this.draftNumber);
@@ -76,7 +79,22 @@ public class RaftNodeLight
         System.out.println("startedElection: " + this.startedElection);
         System.out.println("votedFor: " + this.votedFor);
         System.out.println("role: " + this.role);
+        System.out.println("Received drafts queue length: " + this.receivedDrafts.size());
+        System.out.println("NodeEvents count: " + this.nodeEvents.size());
+        System.out.println("");
 
+
+        System.out.println();
+        System.out.println("CLOCK:");
+        System.out.println(this.clock.getRunningTime());
+
+        System.out.println();
+        System.out.println("EXECUTOR SERVICE:");
+
+
+
+        System.out.println("***");
+        System.out.println();
     }
 
     private void presentMeta()
@@ -160,8 +178,8 @@ public class RaftNodeLight
     HashMap<Byte, Boolean> votesReceived;
 
     BlockingQueue<RaftEntry> proposedEntries;
-    BlockingQueue<Draft> receivedDrafts;
-    BlockingQueue<Draft> outgoingDrafts;
+    public BlockingQueue<Draft> receivedDrafts;
+    public BlockingQueue<Draft> outgoingDrafts;
     BlockingQueue<Draft> proposedDrafts;
     BlockingQueue<RaftEntry> committedLog;
 
@@ -1143,6 +1161,26 @@ public class RaftNodeLight
         RaftNodeLight.presentMetaCounters();
         this.metaCollector.tickIncomingMessages((int)draft.getAuthorId());
         this.receivedDrafts.add(draft);
+    }
+
+    public void deliverDraft(String address, Draft draft) throws NotBoundException, MalformedURLException, RemoteException
+    {
+//        byte[] bytes = new Draft(
+//                Draft.DraftType.HEARTBEAT, (byte)0, (byte)1, 2, 2, 3, 3, new RaftEntry[0]
+//        ).toByteArray();
+//
+//        Draft d =  new Draft(
+//                Draft.DraftType.HEARTBEAT, (byte)0, (byte)1, 2, 2, 3, 3, new RaftEntry[0]
+//        );
+
+        //String address = "rmi://10.0.0." + lastDigit + ":5100/deliverdraft";
+        //MessengerService service = (MessengerService) Naming.lookup(address);
+        System.out.println(address);
+        MessengerService service = (MessengerService) Naming.lookup(address + "deliverdraft");
+        //System.out.println(service.sendMessage("Hey server " + service.getClass().getName()));
+        //System.out.println(service2.deliverDraft(d));
+        service.deliverDraft(draft);
+        System.out.println("Draft delivered lol");
     }
 
 }
