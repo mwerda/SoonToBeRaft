@@ -192,6 +192,70 @@ public class RaftNodeTest {
             e.printStackTrace();
         }
     }
+
+    @Test
+    public void testNewNode() throws InterruptedException, IOException {
+        /**
+         * This test is based off previous testRMIDelivery.
+         * Issue found in previous test is that even though the delivered Draft is enqueued in all of receiver's
+         * servants, it is not picked up by periodic consumer fired up by Clock.
+         **/
+        RaftNodeLight node0 = new RaftNodeLight(200, 5100, "src/configuration", 0);
+        RaftNodeLight node1 = new RaftNodeLight(200, 5101, "src/configuration", 1);
+        RaftNodeLight node2 = new RaftNodeLight(200, 5102, "src/configuration", 2);
+
+// commenting out as this enables old code paths
+//        node0.runNode();
+//        node1.runNode();
+//        node2.runNode();
+
+        RemoteServant servant0 = new RemoteServant(node0);
+        RemoteServant servant1 = new RemoteServant(node1);
+        RemoteServant servant2 = new RemoteServant(node2);
+        RemoteServer rs0 = new RemoteServer(5100, servant0);
+        RemoteServer rs1 = new RemoteServer(5101, servant1);
+        RemoteServer rs2 = new RemoteServer(5102, servant2);
+
+
+        RemoteClient client0 = new RemoteClient();
+        RemoteClient client1 = new RemoteClient();
+        RemoteClient client2 = new RemoteClient();
+
+        try {
+            Draft d = new Draft(
+                    Draft.DraftType.HEARTBEAT, (byte) 0, (byte) 1, 2, 2, 3, 3, new RaftEntry[0]
+            );
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client1.deliverDraft("rmi://169.254.88.42:5101/", d);
+            client2.deliverDraft("rmi://169.254.186.115:5102/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5102/", d);
+
+
+            System.out.println("STRAIGHT AFTER DELIVERY NODE STATUS");
+            node0.presentNodeState();
+            node1.presentNodeState();
+            node2.presentNodeState();
+
+            System.out.println("10 SECONDS AFTER DELIVERY NODE STATUS");
+            Thread.sleep(10000);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+            client0.deliverDraft("rmi://169.254.204.245:5100/", d);
+
+
+            node0.presentNodeState();
+            node1.presentNodeState();
+            node2.presentNodeState();
+
+            System.out.println(servant0.receivedDrafts);
+            System.out.println(servant1.receivedDrafts);
+            System.out.println(servant2.receivedDrafts);
+
+        } catch (NotBoundException e) {
+            e.printStackTrace();
+        }
+    }
 }
 
 class NodeMetrics
